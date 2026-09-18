@@ -7,7 +7,7 @@ CONFIG="${1:-release}"
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 APP="$ROOT/dist/MDQL.app"
 EXT="$APP/Contents/PlugIns/MDQLPreview.appex"
-SIGNING_IDENTITY="${LIGHTMARK_SIGNING_IDENTITY:-}"
+SIGNING_IDENTITY="${MDQL_SIGNING_IDENTITY:-}"
 if [[ -z "$SIGNING_IDENTITY" && -f "$ROOT/.signing-identity" ]]; then
   SIGNING_IDENTITY="$(<"$ROOT/.signing-identity")"
 fi

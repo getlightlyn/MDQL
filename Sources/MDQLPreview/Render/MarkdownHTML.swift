@@ -21,6 +21,13 @@ enum MarkdownHTML {
         var roles: [(NSRange, Role)] = []
         /// 块上带 `align="center"`（居中 logo 的标准写法）
         var centered = false
+        /// 这一块结束时还留着一个带 `align="center"` 的开标签，
+        /// 或者吃掉了一个没有配对的结束标签。
+        /// «踩过» 居中 logo 的标准写法是三行——`<p align="center">`、内容、`</p>`——
+        /// Foundation 会把它拆成三块：对齐写在第一块上，要居中的内容在第二块。
+        /// 对齐得从开标签那块一路带到结束标签那块，不然这个写法从来就没居中过。
+        var opensCentered = false
+        var closesContainer = false
         /// 整块只有一条 `<hr>`
         var rule = false
         /// 摘完标签什么都不剩——`<p align="center">` 单独成块时就是这样，整块丢掉
@@ -41,6 +48,29 @@ enum MarkdownHTML {
     ]
     /// 内容不是给人读的，标签连内容一起丢
     private static let opaque: Set<String> = ["script", "style", "head", "iframe", "noscript", "template"]
+    /// 块级元素：标签摘掉之后前后的内容各占一行，不能连起来
+    private static let blockLevel: Set<String> = [
+        "p", "div", "center", "blockquote", "pre", "address", "form", "fieldset",
+        "h1", "h2", "h3", "h4", "h5", "h6",
+        "ul", "ol", "li", "dl", "dt", "dd",
+        "table", "thead", "tbody", "tfoot", "tr", "caption",
+        "section", "article", "header", "footer", "nav", "aside", "main",
+        "figure", "figcaption", "details", "summary",
+    ]
+
+    /// 栈上一个还没等到结束标签的开标签
+    private struct Open {
+        let name: String
+        /// 开标签自己占的范围
+        let range: NSRange
+        /// 标签后面内容的起点
+        let content: Int
+        let role: Role?
+        /// 标签上带了 `align="center"`
+        let centered: Bool
+        /// 在 `tokens` 里的下标，断行的决定按它查
+        let token: Int
+    }
 
     private static func role(for tag: String) -> Role? {
         switch tag {
@@ -55,6 +85,7 @@ enum MarkdownHTML {
         case "sup": return .superscriptText
         case "sub": return .subscriptText
         case "summary": return .bold
+        case "h1", "h2", "h3", "h4", "h5", "h6": return .bold
         default: return nil
         }
     }
@@ -134,41 +165,82 @@ enum MarkdownHTML {
                 }
             }
         }
-        // (标签名, 开标签范围, 内容起点, 角色)
-        var stack: [(String, NSRange, Int, Role?)] = []
+        var stack: [Open] = []
         var edits: [(NSRange, NSAttributedString?)] = []
         var pending: [(NSRange, Role)] = []
 
-        for (range, token) in tokens {
+        // 块级标签摘掉之后，前后的内容不能连成一行。
+        // «踩过» README 顶上那套居中写法（`<p>` 装 logo、`<h1>` 装名字、`<p>` 装标语）
+        // 被 Foundation 整个并成**一个**没有意图的块，一律删标签的话四行会挤成一句话。
+        //
+        // 断在哪：取「下一段内容之前、最后一个块级标签」——`</p><p>` 中间只断一次，
+        // 开头和结尾的标签前后没内容，不断。
+        var breaks: Set<Int> = []
+        do {
+            let string = text.string as NSString
+            let ink = CharacterSet.whitespacesAndNewlines.inverted
+            var cursor = 0, sawContent = false, candidate: Int?
+            func takeContent() {
+                if sawContent, let index = candidate { breaks.insert(index) }
+                candidate = nil
+                sawContent = true
+            }
+            for (index, (range, token)) in tokens.enumerated() {
+                let gap = NSRange(location: cursor, length: max(0, range.location - cursor))
+                if gap.length > 0, string.rangeOfCharacter(from: ink, range: gap).location != NSNotFound {
+                    takeContent()
+                }
+                switch token {
+                case .open(let name, _), .close(let name):
+                    if blockLevel.contains(name) { candidate = index }
+                case .void("img", _):
+                    takeContent()        // 图片自己就是内容
+                default: break
+                }
+                cursor = NSMaxRange(range)
+            }
+        }
+        /// 删掉一个标签；轮到它断行的话换成一个断行不断段的换行
+        func cut(_ range: NSRange, _ index: Int) {
+            edits.append((range, breaks.contains(index) ? NSAttributedString(string: "\u{2028}") : nil))
+        }
+
+        for (index, (range, token)) in tokens.enumerated() {
             switch token {
             case .comment:
                 edits.append((range, nil))
             case .open(let name, let parsed):
-                if parsed["align"]?.lowercased() == "center" { spans.centered = true }
+                let centered = parsed["align"]?.lowercased() == "center"
+                if centered { spans.centered = true }
                 // 带对齐属性的 `<kbd>` 是在拿它当盒子画边框（GitHub 上的常见写法），
                 // 不是一个按键——按键不需要对齐。这种直接当透明容器。
                 let container = name == "kbd" && parsed["align"] != nil
-                stack.append((name, range, NSMaxRange(range), container ? nil : role(for: name)))
+                stack.append(Open(name: name, range: range, content: NSMaxRange(range),
+                                  role: container ? nil : role(for: name), centered: centered, token: index))
             case .close(let name):
                 // 从栈顶往下找配对；找不到就是一个孤立的结束标签，删掉了事
-                guard let index = stack.lastIndex(where: { $0.0 == name }) else {
-                    edits.append((range, nil)); continue
+                guard let found = stack.lastIndex(where: { $0.name == name }) else {
+                    // 配不上对的结束标签：多半是跨块容器的下半截，`</p>` 收掉上一块开的居中
+                    spans.closesContainer = true
+                    cut(range, index); continue
                 }
-                let (tag, openRange, start, kind) = stack[index]
-                stack.removeSubrange(index...)
-                if opaque.contains(tag) {
+                let opened = stack[found]
+                stack.removeSubrange(found...)
+                if opaque.contains(opened.name) {
                     // <script> 之类连内容一起丢
-                    edits.append((NSRange(location: openRange.location,
-                                          length: NSMaxRange(range) - openRange.location), nil))
+                    edits.append((NSRange(location: opened.range.location,
+                                          length: NSMaxRange(range) - opened.range.location), nil))
                     continue
                 }
-                edits.append((openRange, nil))
-                edits.append((range, nil))
-                if let kind, range.location > start {
-                    pending.append((NSRange(location: start, length: range.location - start), kind))
+                cut(opened.range, opened.token)
+                cut(range, index)
+                if let kind = opened.role, range.location > opened.content {
+                    pending.append((NSRange(location: opened.content,
+                                            length: range.location - opened.content), kind))
                 }
-                if tag == "summary", range.location > start {
-                    edits.append((NSRange(location: start, length: 0), NSAttributedString(string: "▸ ")))
+                if opened.name == "summary", range.location > opened.content {
+                    edits.append((NSRange(location: opened.content, length: 0),
+                                  NSAttributedString(string: "▸ ")))
                 }
             case .void(let name, let parsed):
                 switch name {
@@ -188,14 +260,17 @@ enum MarkdownHTML {
             }
         }
         // 没等到结束标签的开标签（`<p align="center">` 单独成块就是这种）
-        for (tag, openRange, start, kind) in stack {
-            if opaque.contains(tag) {
-                edits.append((NSRange(location: openRange.location, length: text.length - openRange.location), nil))
+        spans.opensCentered = stack.contains { $0.centered }
+        for opened in stack {
+            if opaque.contains(opened.name) {
+                edits.append((NSRange(location: opened.range.location,
+                                      length: text.length - opened.range.location), nil))
                 continue
             }
-            edits.append((openRange, nil))
-            if let kind, text.length > start {
-                pending.append((NSRange(location: start, length: text.length - start), kind))
+            cut(opened.range, opened.token)
+            if let kind = opened.role, text.length > opened.content {
+                pending.append((NSRange(location: opened.content,
+                                        length: text.length - opened.content), kind))
             }
         }
 
@@ -282,11 +357,29 @@ enum MarkdownHTML {
             // 远程图不下载、本地图读不出来，都保留 alt 文字，不留空白
             return alt.map { NSAttributedString(string: $0, attributes: attributes) }
         }
+        let cell = MarkdownRenderer.MarkdownImageCell(imageCell: image)
+        cell.requested = requestedSize(parsed)
         let attachment = NSTextAttachment()
-        attachment.attachmentCell = MarkdownRenderer.MarkdownImageCell(imageCell: image)
+        attachment.attachmentCell = cell
         let result = NSMutableAttributedString(attachment: attachment)
         result.addAttributes(attributes, range: NSRange(location: 0, length: result.length))
         return result
+    }
+
+    /// `<img width="128" height="…">`。HTML 属性只允许纯数字（像素），`px` 后缀和百分比
+    /// 都不合规——前者顺手认了，后者要栏宽才算得出来，按没写处理。
+    /// README 顶上的 logo、行内的徽章全靠这两个属性，不认的话就按原始像素铺出去。
+    private static func requestedSize(_ parsed: [String: String]) -> NSSize? {
+        func number(_ key: String) -> CGFloat? {
+            guard var raw = parsed[key]?.trimmingCharacters(in: .whitespaces), !raw.hasSuffix("%") else { return nil }
+            if raw.hasSuffix("px") { raw.removeLast(2) }
+            guard let value = Double(raw), value > 0 else { return nil }
+            return CGFloat(value)
+        }
+        let width = number("width"), height = number("height")
+        guard width != nil || height != nil else { return nil }
+        // 只写一边时另一边留 0，交给 cell 按原比例配
+        return NSSize(width: width ?? 0, height: height ?? 0)
     }
 
     // MARK: 第二步——上属性

@@ -79,6 +79,8 @@ enum MarkdownRenderer {
         /// 当前这一块里的图片：(alt 文字在 buffer 里的位置, 图片地址)
         var pendingImages: [(NSRange, URL)] = []
         var loader = ImageLoader()
+        /// `<p align="center">` 这类容器开在一块、内容在下一块，对齐得跨块带着走
+        var container: NSTextAlignment?
         var links = LinkResolver()
         var slugs: [String: Int] = [:]
         var markedListItems = Set<Int>()
@@ -115,7 +117,7 @@ enum MarkdownRenderer {
             let item = pending?.components.first { if case .listItem = $0.kind { return true }; return false }
             let startsListItem = item.map { markedListItems.insert($0.identity).inserted } ?? false
             let rendered = NSMutableAttributedString(attributedString: styled(block, intent: pending, previous: previous, startsListItem: startsListItem,
-                                 images: pendingImages, base: base, codeBackground: codeBackground, loader: &loader, links: &links, slugs: &slugs, tables: &tables))
+                                 images: pendingImages, base: base, codeBackground: codeBackground, loader: &loader, links: &links, slugs: &slugs, tables: &tables, container: &container))
             math.restore(in: rendered, codeBlock: isCodeBlock(pending))
             notes.restore(in: rendered, codeBlock: isCodeBlock(pending))
             output.append(rendered)
@@ -262,7 +264,8 @@ enum MarkdownRenderer {
                                loader: inout ImageLoader,
                                links: inout LinkResolver,
                                slugs: inout [String: Int],
-                               tables: inout [Int: NSTextTable]) -> NSAttributedString {
+                               tables: inout [Int: NSTextTable],
+                               container: inout NSTextAlignment?) -> NSAttributedString {
         let kinds = intent?.components.map(\.kind) ?? [.paragraph]
         let text = NSMutableAttributedString(attributedString: raw)
         // 先换图片：这一步会改长度，得赶在算 whole 和取行内意图之前
@@ -394,13 +397,22 @@ enum MarkdownRenderer {
         //
         // 绝大多数段落里冒号和尖括号一个都没有。一次扫描同时回答这两个问题——
         // 分开问的话，每个段落都要多走一遍字符串查找，几千个段落加起来就是几毫秒。
+        // 上一块开着的容器对齐（`<p align="center">` 那三块里的中间一块）。
+        // 放在 HTML 那一步之外：中间那块常常一个尖括号都没有，走不到下面的扫描。
+        if let container, blocks.isEmpty, codeLanguage == nil { style.alignment = container }
+
         var html: MarkdownHTML.Spans?
         if text.mutableString.rangeOfCharacter(from: shortcutMarkers).location != NSNotFound {
             MarkdownEmoji.substitute(in: text, codeBlock: codeLanguage != nil)
             if codeLanguage == nil, let spans = MarkdownHTML.strip(in: text, base: base, loader: &loader) {
+                if spans.opensCentered { container = .center }
+                if spans.closesContainer { container = nil }
                 // `<hr>` 或者只剩一个开标签（居中 logo 那种写法会拆成三块）的块不占版面
                 if spans.empty { return spans.rule ? thematicBreak() : NSAttributedString() }
                 if spans.centered { style.alignment = .center }
+                // HTML 里的 `<img>` 到这一步才变成附件，上面那道行距闸门看不见它。
+                // «实测» 一张 128pt 的 logo 会按 1.35 倍排成 173pt 的行，多出来的 45pt 全空在图上面。
+                if style.lineHeightMultiple != 1, containsTallImage(text) { style.lineHeightMultiple = 1 }
                 html = spans
             }
         }
@@ -625,14 +637,27 @@ enum MarkdownRenderer {
         /// 由视图在版式变化时按视口高度填进来。**不能跟着滚动位置走**：
         /// 那样滚一下图就换一个大小，整篇跟着重排。
         var maxHeight: CGFloat = .greatestFiniteMagnitude
+        /// `<img width="128">` 写死的尺寸。只写一边时另一边记 0，按原比例配。
+        /// «踩过» 不认这两个属性的话，README 顶上那张 512×512 的 logo 会照原始像素排，
+        /// 占掉半个面板——作者写 width 就是因为原图本来就不是要按原大小看的。
+        var requested: NSSize?
+
+        /// 该有多大：写了 `width`/`height` 就听它的，没写就按图片自己的像素。
+        private var natural: NSSize {
+            guard let size = image?.size, size.width > 0, size.height > 0 else { return .zero }
+            guard let requested else { return size }
+            return NSSize(width: requested.width > 0 ? requested.width : size.width * requested.height / size.height,
+                          height: requested.height > 0 ? requested.height : size.height * requested.width / size.width)
+        }
 
         private func fitted(_ width: CGFloat) -> NSSize {
-            guard let size = image?.size, size.width > 0, size.height > 0 else { return .zero }
+            let size = natural
+            guard size.width > 0, size.height > 0 else { return .zero }
             let scale = min(1, max(width, 1) / size.width, max(maxHeight, 1) / size.height)
             return NSSize(width: (size.width * scale).rounded(), height: (size.height * scale).rounded())
         }
 
-        override func cellSize() -> NSSize { image?.size ?? .zero }
+        override func cellSize() -> NSSize { natural }
 
         override func cellFrame(for textContainer: NSTextContainer,
                                 proposedLineFragment lineFrag: NSRect,

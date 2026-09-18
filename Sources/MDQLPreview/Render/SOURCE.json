@@ -1,11 +1,11 @@
 {
   "origin": "Lightlyn",
-  "commit": "e955a2f (工作区有未提交改动)",
-  "synced": "2026-09-18T08:30:53Z",
+  "commit": "0bcbd9d",
+  "synced": "2026-09-18T16:37:34Z",
   "files": {
-    "MarkdownRenderer.swift": "3287f7b36245c85891572193a2f3c5d7e8ac4bfdec23dfadc93031a3d4355ee6",
+    "MarkdownRenderer.swift": "947020a02cf8938cacc6c140f0bcc40ec5813286c3001f62227b7d4b0cc5763d",
     "MarkdownMath.swift": "53be2dc810eb5bbdb833389ea53d6586633fe8d0a2790b5e08c327eb7c41171e",
-    "MarkdownHTML.swift": "0564240c0d29cf441c512606393f38af326982113922b995ab602eff1c997682",
+    "MarkdownHTML.swift": "88bbef2dd724177a1edf2568168ab8b93d34a09cb14483069c5cb4cb18f02701",
     "MarkdownFootnotes.swift": "b052d43e204e83dee040bfdbbf07b215bdbe32f6f0869b766c7fe96d10e10fee",
     "MarkdownEmoji.swift": "027c6e04b70c8c2478bfe0cfb54ee1b1a544ad6dc82f5c536e4368efa33b9b12",
     "SyntaxHighlighter.swift": "634a0c922e5a49a660dccb7839f6425e0e731b0a85a243617f1bab215c23480d"
