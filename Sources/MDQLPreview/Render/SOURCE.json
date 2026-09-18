@@ -1,11 +1,11 @@
 {
   "origin": "Lightlyn",
-  "commit": "1bbcad9 (工作区有未提交改动)",
-  "synced": "2026-09-18T03:45:47Z",
+  "commit": "0952fb1 (工作区有未提交改动)",
+  "synced": "2026-09-18T06:58:29Z",
   "files": {
     "MarkdownRenderer.swift": "8989bb4c8909b2f94d5649c3ccfc3a328538784a74a867166defd1430dd67aae",
     "MarkdownMath.swift": "37dc373faa2091abf01fbb6ac75ce327085bb708579b905101ba6bc5ebe9dbf6",
-    "MarkdownHTML.swift": "5e7c9eeed9839570ddc14c90b14e1be9ad3b6cac307d16d65d72a88dd11da49d",
+    "MarkdownHTML.swift": "0564240c0d29cf441c512606393f38af326982113922b995ab602eff1c997682",
     "MarkdownFootnotes.swift": "b052d43e204e83dee040bfdbbf07b215bdbe32f6f0869b766c7fe96d10e10fee",
     "MarkdownEmoji.swift": "027c6e04b70c8c2478bfe0cfb54ee1b1a544ad6dc82f5c536e4368efa33b9b12",
     "SyntaxHighlighter.swift": "634a0c922e5a49a660dccb7839f6425e0e731b0a85a243617f1bab215c23480d"

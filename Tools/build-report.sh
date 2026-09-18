@@ -21,7 +21,9 @@ PY
 SOURCES=()
 while IFS= read -r f; do SOURCES+=("$f"); done < <(find "$ROOT/Sources/MDQLPreview" -name "*.swift" ! -name "main.swift" | sort)
 OBJECTS=()
-while IFS= read -r o; do OBJECTS+=("$o"); done < <(find "$BIN/SwiftMath.build" -name "*.o" | sort)
+for dir in SwiftMath MDQLOpenerKit; do
+  while IFS= read -r o; do OBJECTS+=("$o"); done < <(find "$BIN/$dir.build" -name "*.o" | sort)
+done
 
 xcrun swiftc -swift-version 5 -O -parse-as-library \
   -target "$(uname -m)-apple-macos15.0" -I "$BIN/Modules" \

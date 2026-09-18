@@ -2,7 +2,7 @@
 # 用扩展的真实源码编一个普通 app 测试台（不带 -application-extension）。
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-APP="$ROOT/.build/PreviewHarness.app"
+APP="$ROOT/.build/BatchScan.app"
 BIN="$ROOT/.build/release"
 [[ -d /Applications/Xcode.app && -z "${DEVELOPER_DIR:-}" ]] && export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
 
@@ -20,7 +20,6 @@ PY
 
 SOURCES=()
 while IFS= read -r f; do SOURCES+=("$f"); done < <(find "$ROOT/Sources/MDQLPreview" -name "*.swift" ! -name "main.swift" | sort)
-# 扩展现在还依赖 MDQLOpenerKit（XPC 协议），测试台也得把它链进来
 OBJECTS=()
 for dir in SwiftMath MDQLOpenerKit; do
   while IFS= read -r o; do OBJECTS+=("$o"); done < <(find "$BIN/$dir.build" -name "*.o" | sort)
@@ -28,7 +27,7 @@ done
 
 xcrun swiftc -swift-version 5 -O -parse-as-library \
   -target "$(uname -m)-apple-macos15.0" -I "$BIN/Modules" \
-  "${OBJECTS[@]}" "${SOURCES[@]}" "$ROOT/Tools/PreviewHarness.swift" \
+  "${OBJECTS[@]}" "${SOURCES[@]}" "$ROOT/Tools/BatchScan.swift" \
   -o "$APP/Contents/MacOS/harness"
 codesign --force --deep --sign - "$APP" >/dev/null 2>&1
 echo "$APP/Contents/MacOS/harness"

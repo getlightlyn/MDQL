@@ -64,6 +64,30 @@ QLMarkdown 的 `external-launcher.xpc` 是同一个办法。
 
 **不支持**：mermaid（见下）、`==高亮==`、嵌套引用的层级、裸 `www.` 自动链接、远程图片。
 
+## 真实文档验收
+
+`Tools/BatchScan.swift` 扫一批文档，不光看崩不崩，还**自动检出渲染不干净的痕迹**：
+排完之后正文里还剩 `<tag>`、`[^1]`、`:smile:`、`$...$`、`\command`，
+就说明那条语法没接住，只是没报错——这种失败不会自己喊出来。
+判据会跳过代码块和行内代码（那里的 `$VAR`、`<div>` 本来就该原样保留），
+不然真问题会淹在误报里。
+
+```sh
+./Tools/build-scan.sh && .build/BatchScan.app/Contents/MacOS/harness 某目录/*.md
+```
+
+拿 GitHub 上 35 份真实 README 跑过一轮（vscode / react / rust / pytorch / kubernetes /
+fzf / KaTeX / mermaid / JavaGuide / awesome-mac 等，含中英文、数学、图表、大量原生 HTML）：
+
+```
+共 35 份：渲染失败 0，有残留 0
+合计 706ms，平均 20.2ms，最慢 awesome-mac.md（256KB）181.6ms
+```
+
+期间抓到并修掉的真实问题：fzf 用 `<kbd align="center">` 圈住一整段来画边框，
+按行内按键那样上底色，底色会贴着字形走，居中之后一行一个宽度、看着像渲染坏了。
+带对齐属性的 `<kbd>` 现在当透明容器处理。
+
 ## 编译
 
 ```sh

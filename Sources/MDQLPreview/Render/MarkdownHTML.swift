@@ -145,7 +145,10 @@ enum MarkdownHTML {
                 edits.append((range, nil))
             case .open(let name, let parsed):
                 if parsed["align"]?.lowercased() == "center" { spans.centered = true }
-                stack.append((name, range, NSMaxRange(range), role(for: name)))
+                // 带对齐属性的 `<kbd>` 是在拿它当盒子画边框（GitHub 上的常见写法），
+                // 不是一个按键——按键不需要对齐。这种直接当透明容器。
+                let container = name == "kbd" && parsed["align"] != nil
+                stack.append((name, range, NSMaxRange(range), container ? nil : role(for: name)))
             case .close(let name):
                 // 从栈顶往下找配对；找不到就是一个孤立的结束标签，删掉了事
                 guard let index = stack.lastIndex(where: { $0.0 == name }) else {
@@ -308,10 +311,18 @@ enum MarkdownHTML {
             case .strikethrough:
                 text.addAttribute(.strikethroughStyle, value: NSUnderlineStyle.single.rawValue, range: range)
             case .code, .keyboard:
-                text.addAttributes([
+                // 跨行说明这个标签被当**块容器**用了，不是行内记号。
+                // «踩过» fzf 的 README 用 `<kbd align="center">` 圈住一整段来画边框：
+                // 按行内按键那样上底色，底色会贴着字形走，居中之后一行一个宽度、
+                // 看着像渲染坏了。`<kbd>` 这种直接放行；`<code>` 保留等宽但去掉底色。
+                let spansLines = text.mutableString.rangeOfCharacter(
+                    from: .newlines, range: range).location != NSNotFound
+                if spansLines, role.isKeyboard { continue }
+                var attributes: [NSAttributedString.Key: Any] = [
                     .font: NSFont.monospacedSystemFont(ofSize: baseFont.pointSize * 0.85, weight: .regular),
-                    .backgroundColor: codeBackground,
-                ], range: range)
+                ]
+                if !spansLines { attributes[.backgroundColor] = codeBackground }
+                text.addAttributes(attributes, range: range)
                 restyled.append(range)
             case .mark:
                 text.addAttribute(.backgroundColor, value: NSColor.systemYellow.withAlphaComponent(0.35), range: range)
@@ -342,5 +353,6 @@ enum MarkdownHTML {
 
 private extension MarkdownHTML.Role {
     var isBold: Bool { if case .bold = self { return true }; return false }
+    var isKeyboard: Bool { if case .keyboard = self { return true }; return false }
     var isSuperscript: Bool { if case .superscriptText = self { return true }; return false }
 }
