@@ -1,9 +1,9 @@
 {
   "origin": "Lightlyn",
-  "commit": "c95f135 (工作区有未提交改动)",
-  "synced": "2026-09-18T07:30:08Z",
+  "commit": "e955a2f (工作区有未提交改动)",
+  "synced": "2026-09-18T08:30:53Z",
   "files": {
-    "MarkdownRenderer.swift": "8989bb4c8909b2f94d5649c3ccfc3a328538784a74a867166defd1430dd67aae",
+    "MarkdownRenderer.swift": "3287f7b36245c85891572193a2f3c5d7e8ac4bfdec23dfadc93031a3d4355ee6",
     "MarkdownMath.swift": "53be2dc810eb5bbdb833389ea53d6586633fe8d0a2790b5e08c327eb7c41171e",
     "MarkdownHTML.swift": "0564240c0d29cf441c512606393f38af326982113922b995ab602eff1c997682",
     "MarkdownFootnotes.swift": "b052d43e204e83dee040bfdbbf07b215bdbe32f6f0869b766c7fe96d10e10fee",

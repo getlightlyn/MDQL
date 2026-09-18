@@ -82,6 +82,8 @@ enum MarkdownRenderer {
         var links = LinkResolver()
         var slugs: [String: Int] = [:]
         var markedListItems = Set<Int>()
+        /// 上一个排出来的表格单元格，用来发现被跳过的空列
+        var lastCell: (table: Int, row: Int, column: Int, columns: Int)?
 
         // 上一个**真正排出来的**块的意图，用来判断「换了一张列表」这种块间关系
         var previous: PresentationIntent?
@@ -97,6 +99,19 @@ enum MarkdownRenderer {
             if output.length > 0, isCodeBlock(pending) || isCodeBlock(previous) {
                 output.append(codeGap)
             }
+            // 空单元格在解析结果里**没有任何 run**（零长度的 run 不存在），于是整格消失、
+            // 同一行后面的列全体左移一位。«踩过» 我们自己 README 的表头第一格是空的，
+            // 渲染出来标题比正文少一列、错位。按意图里的行列号把缺的列补回来。
+            if let kinds = pending?.components.map(\.kind), let cell = tableCell(kinds),
+               let descriptor = tableDescriptor(pending) {
+                let sameRow = lastCell?.table == descriptor.identity && lastCell?.row == cell.row
+                let first = sameRow ? (lastCell!.column + 1) : 0
+                for column in first..<cell.column {
+                    output.append(emptyCell(descriptor, row: cell.row, column: column,
+                                            isHeader: cell.isHeader, tables: &tables))
+                }
+                lastCell = (descriptor.identity, cell.row, cell.column, descriptor.columns.count)
+            }
             let item = pending?.components.first { if case .listItem = $0.kind { return true }; return false }
             let startsListItem = item.map { markedListItems.insert($0.identity).inserted } ?? false
             let rendered = NSMutableAttributedString(attributedString: styled(block, intent: pending, previous: previous, startsListItem: startsListItem,
@@ -108,10 +123,24 @@ enum MarkdownRenderer {
             previous = pending
         }
 
+        /// 换行或离开表格之前，把上一行尾部缺掉的列补上
+        func padRowTail(before intent: PresentationIntent?) {
+            guard let last = lastCell else { return }
+            let cell = intent.map(\.components).map { $0.map(\.kind) }.flatMap(tableCell)
+            let descriptor = tableDescriptor(intent)
+            if descriptor?.identity == last.table, cell?.row == last.row { return }
+            for column in (last.column + 1)..<last.columns {
+                output.append(emptyCell(nil, row: last.row, column: column,
+                                        isHeader: false, tables: &tables, existing: last.table))
+            }
+            lastCell = nil
+        }
+
         for run in source.runs {
             let intent = run.presentationIntent
             if !started || intent != pending {
                 flush()
+                padRowTail(before: intent)
                 pending = intent
                 started = true
             }
@@ -130,6 +159,7 @@ enum MarkdownRenderer {
             }
         }
         flush()
+        padRowTail(before: nil)
         return output
     }
 
@@ -523,6 +553,40 @@ enum MarkdownRenderer {
         guard !path.isEmpty else { return nil }
         let decoded = path.removingPercentEncoding ?? path
         return localURL(URL(fileURLWithPath: decoded, relativeTo: base), base: base)
+    }
+
+    /// 造一个空的表格单元格。
+    ///
+    /// 解析结果里没有这一格，所以拿不到它的 PresentationIntent，只能按行列号自己拼。
+    /// 装饰必须和 `styled` 里那条表格分支一致，否则空格子的边框和底色会和邻居对不上。
+    private static func emptyCell(_ descriptor: (identity: Int, columns: [PresentationIntent.TableColumn])?,
+                                  row: Int, column: Int, isHeader: Bool,
+                                  tables: inout [Int: NSTextTable],
+                                  existing: Int? = nil) -> NSAttributedString {
+        let key = descriptor?.identity ?? existing ?? 0
+        let shared = tables[key] ?? {
+            let created = NSTextTable()
+            created.numberOfColumns = max(descriptor?.columns.count ?? 1, 1)
+            created.layoutAlgorithm = .fixedLayoutAlgorithm
+            created.collapsesBorders = true
+            tables[key] = created
+            return created
+        }()
+        let block = NSTextTableBlock(table: shared, startingRow: row, rowSpan: 1,
+                                     startingColumn: column, columnSpan: 1)
+        block.setWidth(1, type: .absoluteValueType, for: .border)
+        block.setBorderColor(.separatorColor)
+        block.setWidth(bodySize * 0.45, type: .absoluteValueType, for: .padding)
+        block.setWidth(bodySize * 0.8, type: .absoluteValueType, for: .padding, edge: .minX)
+        block.setWidth(bodySize * 0.8, type: .absoluteValueType, for: .padding, edge: .maxX)
+        if !isHeader, row % 2 == 0 { block.backgroundColor = .quaternarySystemFill }
+        let style = NSMutableParagraphStyle()
+        style.lineHeightMultiple = 1.35
+        style.paragraphSpacing = 0
+        style.textBlocks = [block]
+        return NSAttributedString(string: "\n", attributes: [
+            .font: NSFont.systemFont(ofSize: bodySize), .paragraphStyle: style,
+        ])
     }
 
     /// 段落里有没有明显比一行文字高的图片附件。

@@ -7,7 +7,8 @@ import AppKit
 ///
 ///     swift Tools/MakeIcon.swift Resources/AppIcon.icns
 ///
-/// 造型：macOS 的圆角方底 + Markdown 的「M ▾」记号。不模仿系统图标，也不用任何第三方素材。
+/// 造型：macOS 的圆角方底 + 闪电和 D。闪电那道折线就是 M 的右半边，
+/// 和 D 共用中间一竖，合起来读作 MD。不模仿系统图标，也不用任何第三方素材。
 @main enum MakeIcon {
     static let sizes = [16, 32, 64, 128, 256, 512, 1024]
 
@@ -48,46 +49,56 @@ import AppKit
                                    end: CGPoint(x: 0, y: body.midY), options: [])
         context.restoreGState()
 
-        // Markdown 的记号是「M + 朝下的三角」。
-        // 只画 M 容易翻车：拐点必须**向下**，向上就成了 W——上一版就是这么错的。
-        // 16/32 这两档只剩十来个像素，三角和 M 挤在一起会糊成一团，所以小尺寸只留 M。
-        let mark = body.insetBy(dx: body.width * 0.23, dy: body.height * 0.345)
+        // 记号是「闪电 + D」：闪电本身是一道折线，像 M 的右半边，
+        // 和右边的 D 拼起来读作 MD——中间那一竖是两者共用的一笔。
+        // 16/32 两档只剩十来个像素，D 会糊成一坨，那两档只留闪电。
+        let mark = body.insetBy(dx: body.width * 0.17, dy: body.height * 0.24)
         let compact = side < 64
-        // M 和箭头之间要留出气口，挨太近会连成一坨
-        let letter = compact ? mark : CGRect(x: mark.minX, y: mark.minY,
-                                             width: mark.width * 0.56, height: mark.height)
-        let stroke = max(side * (compact ? 0.100 : 0.064), 1.5)
-        let path = NSBezierPath()
-        path.lineWidth = stroke
-        path.lineCapStyle = .round
-        path.lineJoinStyle = .miter
-        path.move(to: CGPoint(x: letter.minX, y: letter.minY))
-        path.line(to: CGPoint(x: letter.minX, y: letter.maxY))
-        path.line(to: CGPoint(x: letter.midX, y: letter.minY + letter.height * 0.26))
-        path.line(to: CGPoint(x: letter.maxX, y: letter.maxY))
-        path.line(to: CGPoint(x: letter.maxX, y: letter.minY))
-        NSColor.white.setStroke()
-        path.stroke()
+        let boltWidth = compact ? mark.width : mark.width * 0.42
+        let bolt = CGRect(x: mark.minX, y: mark.minY, width: boltWidth, height: mark.height)
+
+        // 闪电：上宽下窄的折线，腰部往右折。顶点贴着框，视觉重心才不会往下掉。
+        let flash = NSBezierPath()
+        flash.move(to: CGPoint(x: bolt.minX + bolt.width * 0.52, y: bolt.maxY))
+        flash.line(to: CGPoint(x: bolt.minX, y: bolt.midY + bolt.height * 0.08))
+        flash.line(to: CGPoint(x: bolt.minX + bolt.width * 0.42, y: bolt.midY + bolt.height * 0.08))
+        flash.line(to: CGPoint(x: bolt.minX + bolt.width * 0.16, y: bolt.minY))
+        flash.line(to: CGPoint(x: bolt.maxX, y: bolt.midY + bolt.height * 0.30))
+        flash.line(to: CGPoint(x: bolt.minX + bolt.width * 0.54, y: bolt.midY + bolt.height * 0.30))
+        flash.close()
+        NSColor.white.setFill()
+        flash.fill()
 
         if !compact {
-            let arrowWidth = mark.width * 0.26
-            let arrow = CGRect(x: mark.maxX - arrowWidth, y: mark.minY + mark.height * 0.06,
-                               width: arrowWidth, height: mark.height * 0.88)
-            let stem = NSBezierPath()
-            stem.lineWidth = stroke
-            stem.lineCapStyle = .butt
-            stem.move(to: CGPoint(x: arrow.midX, y: arrow.maxY))
-            stem.line(to: CGPoint(x: arrow.midX, y: arrow.minY + arrow.height * 0.40))
-            NSColor.white.setStroke()
-            stem.stroke()
+            // D = 左边一竖 + 右边半圆。用圆弧画，别手搓贝塞尔控制点——
+            // 上一版内外两条曲线的控制点不一致，笔画粗细不均，中间像被掐了一下。
+            let height = mark.height
+            let width = min(height * 0.82, mark.maxX - (bolt.maxX + mark.width * 0.03))
+            let d = CGRect(x: mark.maxX - width, y: mark.minY, width: width, height: height)
+            let weight = side * 0.062
 
-            let head = NSBezierPath()
-            head.move(to: CGPoint(x: arrow.minX, y: arrow.minY + arrow.height * 0.44))
-            head.line(to: CGPoint(x: arrow.maxX, y: arrow.minY + arrow.height * 0.44))
-            head.line(to: CGPoint(x: arrow.midX, y: arrow.minY))
-            head.close()
+            func shape(_ rect: CGRect) -> NSBezierPath {
+                let radius = min(rect.height / 2, rect.width)
+                let center = CGPoint(x: rect.maxX - radius, y: rect.midY)
+                let path = NSBezierPath()
+                path.move(to: CGPoint(x: rect.minX, y: rect.minY))
+                path.line(to: CGPoint(x: rect.minX, y: rect.maxY))
+                path.line(to: CGPoint(x: center.x, y: rect.maxY))
+                path.appendArc(withCenter: center, radius: radius,
+                               startAngle: 90, endAngle: -90, clockwise: true)
+                path.line(to: CGPoint(x: rect.minX, y: rect.minY))
+                path.close()
+                return path
+            }
+
+            let letter = shape(d)
+            // 内孔：上下各缩一个笔画厚度，左边让开竖线的宽度
+            let hole = shape(CGRect(x: d.minX + weight, y: d.minY + weight,
+                                    width: d.width - weight * 2, height: d.height - weight * 2))
+            letter.append(hole.reversed)
+            letter.windingRule = .evenOdd
             NSColor.white.setFill()
-            head.fill()
+            letter.fill()
         }
 
         NSGraphicsContext.restoreGraphicsState()

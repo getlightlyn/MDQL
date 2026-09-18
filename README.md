@@ -1,211 +1,103 @@
 # MDQL
 
-macOS 的 Markdown 快速查看扩展。在访达里按空格就能看，**不用 WebView**。
+在访达里选中 `.md` 按一下空格，直接看排好版的 Markdown。
 
-扩展整体 2.1 MB，常见 README 首屏 5–20 ms，公式和正文在同一帧出来。
+装上就行，没有设置界面，没有需要打开的主程序。
 
-## 为什么不用 WebView
+---
 
-主流的 Markdown 快速查看扩展都是 `cmark → HTML → WKWebView`。cmark 本身很快
-（433 KB 的文档只要 19 ms），慢的是后面两段：
+## 它能做什么
 
-- WKWebView 要另起一个 WebContent 进程，建视图到第一帧合成有大约 **80–120 ms 的地板**，
-  文件再小也得付；
-- 公式和图表只能交给 JS 库。以 MathJax 为例，冷缓存 **1.8–2.3 秒**，
-  磁盘缓存热了、新进程第一次仍要 **约 220 ms**——而且是**先把 `$...$` 原样显示出来、
-  等库回来再重排**，所以你会看到文字先上屏、公式后跳动。
+标题、列表、表格、代码高亮、公式、图片、原生 HTML、脚注、emoji——常见的 Markdown
+写法基本都排得出来。
 
-MDQL 走 `Foundation AttributedString → TextKit`：Foundation 的解析比 cmark 慢
-（同样 433 KB 要 340 ms），但它没有那 80 ms 的地板，公式由 SwiftMath 本地矢量排版，
-和正文在同一帧完成。**交叉点在 200 KB 附近**——日常 README 是 10–30 KB，
-落在快 6–18 倍的那一侧；真到几百 KB 的导出文件，WebView 那条路更快，
-所以超过 512 KB 我们直接退回等宽纯文本，不硬撑。
+| | |
+|---|---|
+| **快** | 常见 README 按下空格到出字 **5–20 毫秒**，公式和正文同一帧出现，不会先看到一堆 `$...$` 再跳一下 |
+| **小** | 扩展 2.2 MB。不带浏览器内核，不下载任何东西 |
+| **安静** | 预览一个文件**不会产生任何网络请求**。别人发来的 .md 里的追踪像素、统计链接都不会被触发 |
+| **跟随系统** | 深色浅色自动切换，中英文排版都照顾到 |
 
-| | 本机实测（M4 / macOS 27） | MDQL | cmark + WKWebView |
+链接可以点：外链交给浏览器，指向同目录文件的相对链接能打开，`#小节` 和脚注在文内跳转。
+
+## 它不能做什么
+
+这些是明确的边界，装之前值得知道：
+
+| 不支持 | 说明 |
+|---|---|
+| **远程图片** | README 顶上那排徽章、外链图片一律不显示，只留替代文字。换来的是"预览不外发"——这是有意的取舍，不是没做完 |
+| **Mermaid 图表** | 显示成代码块。画出来需要塞进一个浏览器内核，那样体积和速度的优势就没了 |
+| **超过 512 KB 的文件** | 退回等宽纯文本。这种尺寸的 .md 基本是导出的数据或日志，纯文本看反而更快 |
+| **部分冷门语法** | `==高亮==`、定义列表、缩写、自定义容器这些 markdown-it 插件语法不认。GitHub 上也不支持 |
+| **文件名带空格的图片** | `![](image 1.jpg)` 按标准就不是图片，GitHub 同样显示成原文。写成 `image%201.jpg` 可以 |
+
+放在外接硬盘或系统目录里的文档，读不到旁边的图片（只申请了用户主目录的只读权限），会显示替代文字。
+
+## 性能
+
+本机实测，M4 / macOS 27。对照组是主流做法：把 Markdown 转成 HTML 再塞进浏览器内核。
+
+| 文档 | 测的是 | MDQL | 浏览器内核方案 |
 |---|---|---|---|
-| 10 KB 中文文档 | 首帧 | **4.4 ms** | 81 ms |
-| 24 KB README | 首帧 | **18 ms** | 120 ms |
-| 6.7 KB，47 个公式 | 公式排完 | **4.1 ms** | 1468–1837 ms（冷）/ 220 ms（热） |
-| 216 KB 文档 | 宿主内存 | **+22 MB** | 另起进程峰值约 97 MB |
-| 扩展体积 | arm64 | **2.1 MB** | 10.9 MB |
+| 10 KB 中文笔记 | 出字 | **4.4 ms** | 81 ms |
+| 24 KB README | 出字 | **18 ms** | 120 ms |
+| 6.7 KB，47 个公式 | 公式排完 | **4.1 ms** | 1468–1837 ms（首次）/ 220 ms（之后） |
+| 216 KB 文档 | 内存 | **+22 MB** | 另起进程，峰值约 97 MB |
 
-## 支持
+公式那一行差距最大：浏览器方案要去网上取一个数学排版库，取回来之前你看到的是公式源码。
 
-标题、列表（含任务列表和多级嵌套）、引用、表格（对齐、隔行底色、按内容估列宽）、
-代码块（自写 tokenizer 着色，无第三方依赖）、行内格式、本地图片、分隔线、硬换行。
+**上限在哪**：文档越大差距越小，**200 KB 左右两边打平**，再大浏览器方案更快。日常
+README 和笔记都在 10–30 KB，落在快 6–18 倍的那一侧。超过 512 KB 直接退回纯文本。
 
-解析器不管、我们补上的四样：
+**验证范围**：本机 66,245 份 `.md`（310 MB）全部跑过，无一失败；中位 3.7 ms，
+p99 14.2 ms。另外拿 GitHub 上 35 份真实 README（vscode / react / rust / pytorch /
+kubernetes / KaTeX / mermaid 等）逐屏对照过 Typora。
 
-- **原生 HTML** —— `b/i/u/s/code/kbd/mark/small/sub/sup/a/img/br/hr`、`align="center"`、
-  `<details>`。注释和 `script/style/iframe` 连内容丢掉，认不出的标签只留内容。
-- **脚注** —— `[^1]` 上标 + 文末列表，编号按首次引用。
-- **emoji 短码** —— 1725 条 gemoji 表，代码块里的不动。
-- **数学** —— `$...$` / `$$...$$` / `\(...\)` / `\[...\]`，SwiftMath 本地排版。
+## 安装
 
-链接：相对链接按文件所在目录解析，`#锚点` 和脚注上标在文内滚动定位，
-外链交给系统打开——**这一步比看上去麻烦，见下**。
+1. 下载 `MDQL.app`，拖进「应用程序」
+2. **打开一次**——系统要看到它启动过，才会把预览扩展注册进去
+3. 在访达里选中任意 `.md`，按空格
 
-### 开外部链接为什么要带一个 XPC 服务
+### 第一次打开会被拦住
 
-快速查看扩展是**强制沙箱**的，在扩展进程里开不了外部链接：
+现在的版本还没做 Apple 公证，直接双击会提示"无法打开，因为无法验证开发者"。绕过一次即可：
 
-- `NSExtensionContext.open` 是苹果给扩展的正规 API，但要**宿主实现 openURL 服务**，
-  快速查看的宿主不实现；
-- `NSWorkspace.open` 在沙箱的扩展进程里也不生效。
+**右键点 MDQL.app → 打开 → 再点「打开」。**
 
-«实测» 两条都调过、日志都进了，浏览器就是不起来。所以真正干活的是随包分发的
-`MDQLPreview.appex/Contents/XPCServices/MDQLOpener.xpc`（64 KB）：
-它的 entitlements 是空的、**不带 `app-sandbox`**，在那里 `NSWorkspace.open` 正常。
-服务由 launchd 按需拉起、闲置回收，不需要我们管理生命周期。
-QLMarkdown 的 `external-launcher.xpc` 是同一个办法。
+用右键菜单里的「打开」，和双击走的是两条路——这条会给你一个"仍要打开"的按钮。
+只需要做一次，之后就正常了。
 
-它跑在沙箱外，所以是一道权限边界：**协议白名单判在服务端**
-（`http/https/mailto/file`），客户端那份只是省一次 IPC，不是安全边界。
+如果右键也没有「打开」选项，在「系统设置 → 隐私与安全性」往下翻，会看到
+"已阻止 MDQL"，点旁边的「仍要打开」。
 
-**不支持**：mermaid（见下）、`==高亮==`、嵌套引用的层级、裸 `www.` 自动链接、远程图片。
+### 预览没有变化？
 
-## 真实文档验收
+`.md` 可能被别的扩展占着，**系统只会挑一个用**。到
+「系统设置 → 通用 → 登录项与扩展 → 快速查看」里，把其它 Markdown 预览关掉、只留 MDQL。
 
-`Tools/BatchScan.swift` 扫一批文档，不光看崩不崩，还**自动检出渲染不干净的痕迹**：
-排完之后正文里还剩 `<tag>`、`[^1]`、`:smile:`、`$...$`、`\command`，
-就说明那条语法没接住，只是没报错——这种失败不会自己喊出来。
-判据会跳过代码块和行内代码（那里的 `$VAR`、`<div>` 本来就该原样保留），
-不然真问题会淹在误报里。
+确认是否注册成功：
 
 ```sh
-./Tools/build-scan.sh && .build/BatchScan.app/Contents/MacOS/harness 某目录/*.md
+pluginkit -m -i com.lightlyn.MDQL.QLExtension
 ```
 
-跑过两轮：GitHub 上 35 份真实 README（vscode / react / rust / pytorch / kubernetes /
-fzf / KaTeX / mermaid / JavaGuide / awesome-mac），以及本机全部 66,245 份 `.md`（310MB）。
-
-```
-共 66245 份：渲染 66242，失败 0，有残留 161，超尺寸闸 3，非 UTF-8 0
-平均 4.4ms  中位 3.7ms  p90 7.4ms  p99 14.2ms
-```
-
-超尺寸闸只有 3 份（0.005%），退回纯文本是设计行为。剩下的 161 条残留逐个看过，
-全是检测器的误报：时间戳 `12:03:45` 里的 `:03:`、十六进制 ID `:4700:`
-（都不在 gemoji 表里，原样保留是对的），以及 QLMarkdown 自己的例子文件里
-那些我们明确不支持的 markdown-it 插件语法。
-
-**这两轮真正抓到的问题**（都已修，都有回归）：
-
-- fzf 用 `<kbd align="center">` 圈住一整段画边框。我们把 `<kbd>` 映射成按键样式，
-  底色贴着字形走，居中之后一行一个宽度，看着像渲染坏了。带对齐属性的 `<kbd>`
-  现在当透明容器——按键不需要对齐，这个信号够准。
-- 本机文档里 356 条行内公式 + 49 条块公式，SwiftMath 原本挂掉 23 + 44 条。
-  补齐 `\pmb \dots \mod \boxed \overrightarrow \tag \begin{array}` 等映射后，
-  **块公式 49/49 全过，行内只剩 10 条失败——而那 10 条根本不是公式**
-  （JSON 的 `$ref \"#/`、shell 的 `printf ...\n`，一行里恰好两个 `$`），
-  退回源码正是期望行为。
-- SwiftMath 的 `aligned` 要求每行**正好一个** `&`：没有对齐符的单行公式和多于
-  一组对齐列的都会整条报错。这两种降级成 `gather`（它认 `gather`，不认 `gathered`）。
-
-**这个扫描证明的是「没有特定失败特征」，不是「视觉正确」。** 一份文档完全可能表格
-列宽算错、文字叠在一起而扫描照样报 0 残留。视觉那一层靠 `RichProbe`（53 项断言，
-量的是排完的行片段和属性）加人工抽查对照 Typora。
-
-## 编译
+## 自己编译
 
 ```sh
 ./build.sh release          # 产物在 dist/MDQL.app
 ```
 
-安装：把 `dist/MDQL.app` 拖进 `/Applications` 并打开一次，系统才会注册扩展。
-如果 .md 的预览没变，多半是同类扩展不止一个——系统只挑一个用，
-到「系统设置 → 通用 → 登录项与扩展 → 快速查看」里只留 MDQL。
-
-```sh
-pluginkit -m -i com.lightlyn.MDQL.QLExtension    # 确认注册
-./Tools/build-harness.sh && .build/PreviewHarness.app/Contents/MacOS/harness 某文件.md 输出目录
-```
-
-最后这条是验收用的测试台：快速查看面板没法自动化，装扩展又会抢掉系统里现有的 .md 预览，
-所以它把**扩展真正的 `PreviewViewController`** 放进一个普通窗口跑一遍，深浅色各截一张图。
-它能证伪扩展自己的代码路径；证明不了系统注册和沙箱，那两件仍然要真装一次。
-
-## 和 Lightlyn 的关系
-
-渲染器的上游在 **Lightlyn**（闭源商业软件），本仓库里的 `Sources/MDQLPreview/Render/`
-是从那边**同步下来的只读副本**——真文件，不是链接，clone 下来就能编。
-
-这个方向是有意的：Lightlyn 分发出去的东西要保持干净，不为了共享去背一个外部依赖；
-本仓库也不反向依赖任何闭源代码。代价是**渲染器不接受本仓库的 PR**——
-改动请开 issue，我们在上游落地后同步下来。扩展自己的代码（`PreviewViewController.swift`、
-`MarkdownScrollView.swift`、宿主应用、打包脚本）欢迎直接提 PR。
-
-```sh
-./Tools/sync-render.sh    # 从 Lightlyn 同步，刷新 Render/SOURCE.json 里的 commit 和校验和
-./Tools/check-render.sh   # 校验没被就地改过；build.sh 每次都会跑
-```
-
-共享的只有这六个文件，它们只依赖 AppKit / Foundation / SwiftMath，
-不引 SwiftUI、不碰应用状态——这条约束是上游的硬规矩，破了两边都编不过：
-
-```
-MarkdownRenderer.swift    Markdown → TextKit 属性串
-MarkdownMath.swift        公式（SwiftMath）
-MarkdownHTML.swift        原生 HTML
-MarkdownFootnotes.swift   脚注
-MarkdownEmoji.swift       emoji 短码
-SyntaxHighlighter.swift   代码着色
-```
-
-界面各自实现：主应用是 SwiftUI 的 `MarkdownPreviewView`，
-扩展是 `PreviewViewController` + `MarkdownScrollView`。
-
-## 沙箱
-
-扩展必须沙箱，系统只保证**被预览的文件本身**可读——旁边的 `assets/img/logo.png` 读不到。
-所有 Markdown 快速查看扩展都要面对这一条。
-
-实测（macOS 27，`qlmanage -x -p` 走真实的 QuickLookUIService）：
-
-| 图片位置 | 不加例外 | 加 home 只读例外 |
-|---|---|---|
-| 同级目录 | ✗ | ✓ |
-| 子目录 `assets/img/` | ✗ | ✓ |
-| 上一级 `../` | ✗ | ✓ |
-| 远程 http(s) | ✗ | ✗（见下） |
-
-注意 `/private/tmp` 下三种都能读——那里没有保护，**别拿它当验证环境**，我一开始就被它骗过。
-
-所以扩展申请了 `com.apple.security.temporary-exception.files.home-relative-path.read-only`。
-范围收窄到用户主目录：覆盖 `~/Documents`、`~/Desktop`、`~/Downloads` 和代码仓库，
-不碰系统目录和外接卷，且只读。QLMarkdown 开的是整盘的 `absolute-path` 版本。
-代价是放在外接卷或 `/opt` 下的文档读不到旁边的图，会退回替代文字。
-
-### 为什么不申请网络
-
-远程图片（README 顶上那排徽章）需要 `com.apple.security.network.client`。没加，而且这个
-决定不只是少一个 entitlement：
-
-- 光加权限没有用——得真去下载。而渲染是**同步**的，`preparePreviewOfFile` 返回前面板不显示：
-  要么卡在网络上（网慢或断网时预览直接挂住），要么先出替代文字、图到了再重排——
-  那正是本项目一直在批评 MathJax 的那种跳动。
-- 更重要的是：**预览一个来路不明的 .md 不会向外发任何请求**。追踪像素、IP 泄露都没机会。
-  对一个专门用来看陌生文件的工具，这是实打实的属性。
-
-要加的话应该是：后台抓取 + 短超时 + 单图大小上限 + 宿主应用里的开关，默认关。
-
-## mermaid
-
-现在显示成代码块。要真画出来只有三条路：
-
-1. **只为 mermaid 块挂一个 WKWebView** —— 最省事，但 WebKit 和那个独立进程又回来了，
-   本项目全部的体积和速度优势建立在没有它上面。
-2. **JavaScriptCore 跑 mermaid** —— JSC 是系统框架，不额外占体积也不另起进程。
-   但 mermaid 的布局依赖真实 DOM 的 `getBBox()` 量文字，官方的非浏览器方案
-   （mermaid-cli）用的是 Puppeteer，也就是一整个 headless Chrome。
-   换个 JS 引擎解决不了，得自己补一层够用的 DOM/SVG 垫片，脆且跟不动上游版本。
-3. **自己画常见的那几种** —— 解析 `flowchart`/`graph`（TD/LR）和 `sequenceDiagram`，
-   用 CoreText 量字、分层布局、CoreGraphics 画成附件，和公式走同一条路。
-   README 里的 mermaid 绝大多数就是这两类。工作量真实，但架构上是干净的。
-
-倾向第 3 条，作为后面的一个里程碑；在那之前保持现状——显示源码总比显示一个空框好。
+需要 Xcode。目前发布的是 Apple 芯片版本；源码本身兼容 Intel，
+`swift build -c release --arch arm64 --arch x86_64` 可以出通用二进制，但没有在
+Intel 机器上实测过。
 
 ## 许可
 
-MIT。emoji 短码表来自 [gemoji](https://github.com/github/gemoji)，
-公式排版来自 [SwiftMath](https://github.com/mgriebling/SwiftMath)。
+MIT，见 [LICENSE](LICENSE)。第三方素材与依赖见 [NOTICE](NOTICE)。
+
+渲染引擎与 [Lightlyn](https://github.com/) 共用同一份源码，上游在 Lightlyn。
+`Sources/MDQLPreview/Render/` 下的文件是同步下来的只读副本，**不接受直接修改**——
+渲染相关的问题请开 issue；扩展本身、打包脚本、文档欢迎直接提 PR。
+详见 [Render/README.md](Sources/MDQLPreview/Render/README.md)。
