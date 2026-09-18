@@ -1,0 +1,12 @@
+MDQL 使用的第三方素材与依赖：
+
+- SwiftMath (MIT) — 公式排版
+  https://github.com/mgriebling/SwiftMath
+- Latin Modern Math (GUST Font License) — SwiftMath 附带的数学字体
+  许可原文随扩展一起分发，见 MDQLPreview.appex/Contents/Resources/
+  SwiftMath_SwiftMath.bundle/mathFonts.bundle/{OFL.txt,GUST-FONT-LICENSE.txt}
+- gemoji (MIT) — emoji 短码表的数据源
+  https://github.com/github/gemoji
+  表由 Tools/generate-emoji-table.py 生成，不含 gemoji 的代码
+
+渲染器源码的上游是 Lightlyn（闭源），以 MIT 授权分发于本仓库，见 LICENSE。

@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleDevelopmentRegion</key><string>en</string>
+  <key>CFBundleDisplayName</key><string>MDQL</string>
+  <key>CFBundleExecutable</key><string>MDQLPreview</string>
+  <key>CFBundleIdentifier</key><string>com.lightlyn.MDQL.QLExtension</string>
+  <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
+  <key>CFBundleName</key><string>MDQL</string>
+  <key>CFBundlePackageType</key><string>XPC!</string>
+  <key>CFBundleShortVersionString</key><string>0.1.0</string>
+  <key>CFBundleVersion</key><string>1</string>
+  <key>LSMinimumSystemVersion</key><string>15.0</string>
+  <key>NSExtension</key>
+  <dict>
+    <key>NSExtensionAttributes</key>
+    <dict>
+      <!-- 不设 QLIsDataBasedPreview：我们要的是文件地址，同目录的图片和相对链接靠它解 -->
+      <key>QLSupportedContentTypes</key>
+      <array>
+        <string>net.daringfireball.markdown</string>
+        <string>public.markdown</string>
+        <string>io.typora.markdown</string>
+        <string>net.ia.markdown</string>
+        <string>com.unknown.md</string>
+        <string>org.quarto.qmarkdown</string>
+        <string>com.rstudio.rmarkdown</string>
+      </array>
+      <key>QLSupportsSearchableItems</key><false/>
+    </dict>
+    <key>NSExtensionPointIdentifier</key><string>com.apple.quicklook.preview</string>
+    <key>NSExtensionPrincipalClass</key><string>MDQLPreview.PreviewViewController</string>
+  </dict>
+</dict>
+</plist>

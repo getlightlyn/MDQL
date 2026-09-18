@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>com.apple.security.app-sandbox</key><true/>
+  <key>com.apple.security.files.user-selected.read-only</key><true/>
+  <!--
+    同目录 / 子目录的图片。
+    沙箱只保证被预览的文件本身可读，旁边的 assets/img/logo.png 读不到——
+    «实测» 在 ~/Documents 下三种相对路径的图全部失败，只有 /private/tmp 能读到（那里没有保护）。
+    这是所有 Markdown 快速查看扩展都要面对的，QLMarkdown 开的是整盘 `absolute-path` 只读。
+    这里收窄到用户主目录：覆盖 ~/Documents、~/Desktop、~/Downloads 和代码仓库，
+    不碰系统目录和外接卷。只读，不申请写。
+  -->
+  <key>com.apple.security.temporary-exception.files.home-relative-path.read-only</key>
+  <array><string>/</string></array>
+</dict>
+</plist>
