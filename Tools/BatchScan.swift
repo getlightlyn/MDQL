@@ -20,7 +20,10 @@ import AppKit
               source: rx(#"</?[a-zA-Z][a-zA-Z0-9]*(\s[^<>\n]{0,80})?/?>"#)),
         .init(label: "脚注引用", pattern: rx(#"\[\^[^\]\s]+\]"#), source: rx(#"\[\^[^\]\s]+\]"#)),
         .init(label: "emoji 短码", pattern: rx(#":[a-z0-9_+-]{2,30}:"#), source: rx(#":[a-z0-9_+-]{2,30}:"#)),
-        .init(label: "未渲染公式", pattern: rx(#"\$\$?[^$\n]{2,}\$\$?"#), source: rx(#"\$\$?[^$\n]{2,}\$\$?"#)),
+        // 必须含反斜杠命令才算公式：shell 的 `$HOME`、JSON 的 `$ref` 一行里也有两个 $，
+        // 不加这条判据的话它们会永远报假阳，把真问题淹掉
+        .init(label: "未渲染公式", pattern: rx(#"\$\$?[^$\n]*\\[a-zA-Z]+[^$\n]*\$\$?"#),
+              source: rx(#"\$\$?[^$\n]*\\[a-zA-Z]+[^$\n]*\$\$?"#)),
         .init(label: "裸 LaTeX 命令", pattern: rx(#"\\(frac|sum|int|alpha|beta|operatorname|mathrm|left|right)\b"#),
               source: rx(#"\\(frac|sum|int|alpha|beta|operatorname|mathrm|left|right)\b"#)),
         .init(label: "Markdown 图片语法", pattern: rx(#"!\[[^\]]*\]\([^)]+\)"#), source: rx(#"!\[[^\]]*\]\([^)]+\)"#)),
@@ -56,31 +59,45 @@ import AppKit
     }
 
     static func main() {
-        let inputs = Array(CommandLine.arguments.dropFirst())
+        var inputs = Array(CommandLine.arguments.dropFirst())
+        // 几万份文件塞不进 argv，也不该逐份刷屏。给一个清单文件走安静模式：
+        // 只报问题和最慢的几份，其余只累计。
+        var quiet = false
+        if inputs.first == "--list", inputs.count > 1,
+           let listing = try? String(contentsOfFile: inputs[1], encoding: .utf8) {
+            inputs = listing.split(separator: "\n").map(String.init)
+            quiet = true
+        }
         NSApplication.shared.setActivationPolicy(.accessory)
         Task { @MainActor in
-            var failures = 0, dirty = 0, slowest: (String, Double) = ("", 0)
+            var failures = 0, dirty = 0, unreadable = 0, gated = 0
             var total = 0.0
+            var timings: [(String, Double)] = []
+            var started = CFAbsoluteTimeGetCurrent()
             let scroll = MarkdownScrollView(frame: NSRect(x: 0, y: 0, width: 900, height: 800))
-            print(pad("文件", 36) + pad("KB", 8) + pad("ms", 9) + pad("附件", 6) + "残留")
+            if !quiet { print(pad("文件", 36) + pad("KB", 8) + pad("ms", 9) + pad("附件", 6) + "残留") }
             for path in inputs {
                 let url = URL(fileURLWithPath: path)
                 let name = url.lastPathComponent
                 let bytes = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
                 guard let source = try? String(contentsOf: url, encoding: .utf8) else {
-                    print("\(name): 读不出来"); failures += 1; continue
+                    // UTF-8 解不开的多半根本不是 Markdown（二进制、别的编码），不算渲染失败
+                    unreadable += 1; continue
                 }
-                let started = CFAbsoluteTimeGetCurrent()
+                let began = CFAbsoluteTimeGetCurrent()
                 guard let document = MarkdownRenderer.render(contentsOf: url) else {
-                    print(pad(name, 36) + pad(String(bytes / 1024), 8) + "渲染返回 nil（超过 512KiB 闸？）")
-                    failures += 1; continue
+                    // 超过 512KiB 的尺寸闸是设计行为，退回纯文本；不是失败
+                    if bytes > MarkdownRenderer.sourceLimit { gated += 1 } else {
+                        print("渲染返回 nil: \(url.path)"); failures += 1
+                    }
+                    continue
                 }
                 // 排一屏，把排版阶段的崩溃也覆盖进来
                 scroll.setDocument(document)
                 scroll.layoutSubtreeIfNeeded()
-                let elapsed = (CFAbsoluteTimeGetCurrent() - started) * 1000
+                let elapsed = (CFAbsoluteTimeGetCurrent() - began) * 1000
                 total += elapsed
-                if elapsed > slowest.1 { slowest = (name, elapsed) }
+                timings.append((url.path, elapsed))
 
                 var attachments = 0
                 document.enumerateAttribute(.attachment, in: NSRange(location: 0, length: document.length)) { value, _, _ in
@@ -92,16 +109,35 @@ import AppKit
                     let after = countOutsideCode(check.pattern, in: document)
                     if before > 0, after > 0 { notes.append("\(check.label)×\(after)") }
                 }
-                if !notes.isEmpty { dirty += 1 }
-                print(pad(name, 36) + pad(String(bytes / 1024), 8)
-                      + pad(String(format: "%.1f", elapsed), 9) + pad(String(attachments), 6)
-                      + (notes.isEmpty ? "—" : notes.joined(separator: " ")))
-                fflush(stdout)
+                if !notes.isEmpty {
+                    dirty += 1
+                    print("残留 \(notes.joined(separator: " ")): \(url.path)")
+                    fflush(stdout)
+                }
+                if !quiet {
+                    print(pad(name, 36) + pad(String(bytes / 1024), 8)
+                          + pad(String(format: "%.1f", elapsed), 9) + pad(String(attachments), 6)
+                          + (notes.isEmpty ? "—" : notes.joined(separator: " ")))
+                    fflush(stdout)
+                } else if timings.count % 5000 == 0 {
+                    let wall = CFAbsoluteTimeGetCurrent() - started
+                    print(String(format: "  …已扫 %d 份，用时 %.0fs", timings.count, wall))
+                    fflush(stdout)
+                }
             }
             print("")
-            print("共 \(inputs.count) 份：渲染失败 \(failures)，有残留 \(dirty)")
-            print(String(format: "合计 %.0fms，平均 %.1fms，最慢 %@ %.1fms",
-                         total, total / Double(max(inputs.count - failures, 1)), slowest.0, slowest.1))
+            print("共 \(inputs.count) 份：渲染 \(timings.count)，失败 \(failures)，"
+                  + "有残留 \(dirty)，超尺寸闸 \(gated)，非 UTF-8 \(unreadable)")
+            print(String(format: "合计 %.1fs，平均 %.1fms", total / 1000, total / Double(max(timings.count, 1))))
+            let ranked = timings.sorted { $0.1 > $1.1 }
+            print("最慢 10 份：")
+            for (path, ms) in ranked.prefix(10) { print(String(format: "  %8.1fms  %@", ms, path)) }
+            if timings.count > 20 {
+                let sorted = timings.map(\.1).sorted()
+                print(String(format: "分位：中位 %.1fms  p90 %.1fms  p99 %.1fms",
+                             sorted[sorted.count / 2], sorted[Int(Double(sorted.count) * 0.9)],
+                             sorted[Int(Double(sorted.count) * 0.99)]))
+            }
             exit(failures == 0 ? 0 : 1)
         }
         NSApplication.shared.run()

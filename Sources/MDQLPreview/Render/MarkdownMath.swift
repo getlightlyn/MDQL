@@ -182,6 +182,10 @@ enum MarkdownMath {
         "lVert": #"\|"#, "rVert": #"\|"#, "lvert": "|", "rvert": "|",
         "argmax": #"\mathrm{arg\,max}"#, "argmin": #"\mathrm{arg\,min}"#,
         "xrightarrow": #"\rightarrow"#, "xleftarrow": #"\leftarrow"#,
+        // 下面这批是拿 66k 份本机文档扫出来的：356 条真实公式里 SwiftMath 认不了
+        // 的命令，逐条对到它认的等价写法上。`\bmod` 它同样不认，所以走 \mathrm。
+        "pmb": #"\mathbf"#, "dots": #"\ldots"#, "mod": #"\mathrm{mod}"#,
+        "overrightarrow": #"\vec"#, "overleftarrow": #"\vec"#,
     ]
 
     /// 命令名 → (要读几个花括号组, 保留第几个；nil 表示整条丢掉)
@@ -191,14 +195,45 @@ enum MarkdownMath {
         "substack": (1, 0), "href": (2, 1),
         "phantom": (1, nil), "hphantom": (1, nil), "vphantom": (1, nil),
         "rule": (2, nil), "DeclareMathOperator": (2, nil),
+        // `\boxed{x}` 只是给 x 画个框，框画不出来内容也得留下；
+        // `\tag{1}` 是公式编号，SwiftMath 不认，整条丢掉不影响读公式本身
+        "boxed": (1, 0), "tag": (1, nil),
     ]
 
     /// `\begin{align}` 这类 SwiftMath 不认，但对应的 `aligned` 认
     private static let environments = [
         "{align}": "{aligned}", "{align*}": "{aligned}",
         "{eqnarray}": "{aligned}", "{eqnarray*}": "{aligned}",
-        "{gather}": "{gathered}", "{gather*}": "{gathered}",
+        // SwiftMath 认 gather，不认 gathered——别把好的换成坏的，只去掉星号
+        "{gather*}": "{gather}",
+        // array 的列格式说明（`{r}`、`{cc}`）SwiftMath 不认，连同环境一起换成 matrix
+        "{array}": "{matrix}",
     ]
+
+    /// SwiftMath 的 `aligned` 只支持两列，`&` 多于一个就整条报错。
+    /// 真 LaTeX 的 align 允许多组对齐列，公式里出现两个以上 `&` 很常见。
+    /// 这种降级成 `gathered`（逐行居中）并去掉 `&`——丢的是对齐，不是内容；
+    /// 总比整条公式退回成一片反斜杠强。
+    private static func degradeWideAligned(_ source: String) -> String {
+        guard source.contains(#"\begin{aligned}"#) else { return source }
+        var result = source
+        while let start = result.range(of: #"\begin{aligned}"#),
+              let end = result.range(of: #"\end{aligned}"#, range: start.upperBound..<result.endIndex) {
+            let body = String(result[start.upperBound..<end.lowerBound])
+            // SwiftMath 的 aligned 要求**每行正好一个** `&`：没有对齐符的单行公式
+            // 和多于一组对齐列的都会整条报错。只有全都恰好一个时才留着。
+            let columns = body.components(separatedBy: #"\\"#)
+                .map { $0.filter { $0 == "&" }.count }
+            let replacement: String
+            if columns.contains(where: { $0 != 1 }) {
+                replacement = #"\begin{gather}"# + body.replacingOccurrences(of: "&", with: "") + #"\end{gather}"#
+            } else {
+                replacement = #"\begin{ALIGNEDOK}"# + body + #"\end{ALIGNEDOK}"#
+            }
+            result.replaceSubrange(start.lowerBound..<end.upperBound, with: replacement)
+        }
+        return result.replacingOccurrences(of: "ALIGNEDOK", with: "aligned")
+    }
 
     static func compatible(_ latex: String, depth: Int = 0) -> String {
         guard depth < 8 else { return latex }
@@ -207,6 +242,15 @@ enum MarkdownMath {
             source = source.replacingOccurrences(of: #"\begin"# + from, with: #"\begin"# + to)
             source = source.replacingOccurrences(of: #"\end"# + from, with: #"\end"# + to)
         }
+
+        // `\begin{array}{r}` 的列格式说明换成 matrix 之后就是多余的一组花括号，
+        // 留着会被当成一个内容为 "r" 的单元格
+        if source.contains(#"\begin{matrix}"#) {
+            source = source.replacingOccurrences(
+                of: #"(\\begin\{matrix\})\s*\{[lcr|@\s.]*\}"#,
+                with: "$1", options: .regularExpression)
+        }
+        source = degradeWideAligned(source)
 
         let text = Array(source)
         var output = "", index = 0

@@ -76,17 +76,35 @@ QLMarkdown 的 `external-launcher.xpc` 是同一个办法。
 ./Tools/build-scan.sh && .build/BatchScan.app/Contents/MacOS/harness 某目录/*.md
 ```
 
-拿 GitHub 上 35 份真实 README 跑过一轮（vscode / react / rust / pytorch / kubernetes /
-fzf / KaTeX / mermaid / JavaGuide / awesome-mac 等，含中英文、数学、图表、大量原生 HTML）：
+跑过两轮：GitHub 上 35 份真实 README（vscode / react / rust / pytorch / kubernetes /
+fzf / KaTeX / mermaid / JavaGuide / awesome-mac），以及本机全部 66,245 份 `.md`（310MB）。
 
 ```
-共 35 份：渲染失败 0，有残留 0
-合计 706ms，平均 20.2ms，最慢 awesome-mac.md（256KB）181.6ms
+共 66245 份：渲染 66242，失败 0，有残留 161，超尺寸闸 3，非 UTF-8 0
+平均 4.4ms  中位 3.7ms  p90 7.4ms  p99 14.2ms
 ```
 
-期间抓到并修掉的真实问题：fzf 用 `<kbd align="center">` 圈住一整段来画边框，
-按行内按键那样上底色，底色会贴着字形走，居中之后一行一个宽度、看着像渲染坏了。
-带对齐属性的 `<kbd>` 现在当透明容器处理。
+超尺寸闸只有 3 份（0.005%），退回纯文本是设计行为。剩下的 161 条残留逐个看过，
+全是检测器的误报：时间戳 `12:03:45` 里的 `:03:`、十六进制 ID `:4700:`
+（都不在 gemoji 表里，原样保留是对的），以及 QLMarkdown 自己的例子文件里
+那些我们明确不支持的 markdown-it 插件语法。
+
+**这两轮真正抓到的问题**（都已修，都有回归）：
+
+- fzf 用 `<kbd align="center">` 圈住一整段画边框。我们把 `<kbd>` 映射成按键样式，
+  底色贴着字形走，居中之后一行一个宽度，看着像渲染坏了。带对齐属性的 `<kbd>`
+  现在当透明容器——按键不需要对齐，这个信号够准。
+- 本机文档里 356 条行内公式 + 49 条块公式，SwiftMath 原本挂掉 23 + 44 条。
+  补齐 `\pmb \dots \mod \boxed \overrightarrow \tag \begin{array}` 等映射后，
+  **块公式 49/49 全过，行内只剩 10 条失败——而那 10 条根本不是公式**
+  （JSON 的 `$ref \"#/`、shell 的 `printf ...\n`，一行里恰好两个 `$`），
+  退回源码正是期望行为。
+- SwiftMath 的 `aligned` 要求每行**正好一个** `&`：没有对齐符的单行公式和多于
+  一组对齐列的都会整条报错。这两种降级成 `gather`（它认 `gather`，不认 `gathered`）。
+
+**这个扫描证明的是「没有特定失败特征」，不是「视觉正确」。** 一份文档完全可能表格
+列宽算错、文字叠在一起而扫描照样报 0 残留。视觉那一层靠 `RichProbe`（53 项断言，
+量的是排完的行片段和属性）加人工抽查对照 Typora。
 
 ## 编译
 
