@@ -1,7 +1,7 @@
 {
   "origin": "Lightlyn",
-  "commit": "f92534d (工作区有未提交改动)",
-  "synced": "2026-09-19T08:45:50Z",
+  "commit": "4fa5fcf",
+  "synced": "2026-09-19T10:02:28Z",
   "files": {
     "Sources/MDQLPreview/Render/MarkdownRenderer.swift": { "from": "Sources/LightlynApp/Preview/Formats/Text/MarkdownRenderer.swift", "sha256": "781f59e83d79ffe475e647df5b7268ea18e628ae80da4ba2ed4f342fdb5f0611" },
     "Sources/MDQLPreview/Render/MarkdownMath.swift": { "from": "Sources/LightlynApp/Preview/Formats/Text/MarkdownMath.swift", "sha256": "53be2dc810eb5bbdb833389ea53d6586633fe8d0a2790b5e08c327eb7c41171e" },
