@@ -483,6 +483,11 @@ enum MarkdownRenderer {
         static let byteLimit = 8 * 1024 * 1024
         /// 一篇文档最多加载多少张
         static let countLimit = 64
+        /// 可选的准入闸。返回 false 的图当作读不到处理。
+        ///
+        /// 主应用不设，一律放行。快速查看扩展会装上它——那边是沙箱进程，
+        /// 得把读取范围收窄到用户授权过的目录，不能文档指哪读哪。
+        nonisolated(unsafe) static var permits: ((URL) -> Bool)?
 
         private var cache: [URL: NSImage] = [:]
         private var loaded = 0
@@ -490,6 +495,7 @@ enum MarkdownRenderer {
         mutating func image(at url: URL) -> NSImage? {
             if let hit = cache[url] { return hit }
             guard loaded < Self.countLimit else { return nil }
+            guard Self.permits?(url) ?? true else { return nil }
             let size = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
             guard size > 0, size <= Self.byteLimit, let image = NSImage(contentsOf: url),
                   image.size.width > 0, image.size.height > 0 else { return nil }

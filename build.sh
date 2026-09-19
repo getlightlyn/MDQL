@@ -1,21 +1,33 @@
 #!/bin/zsh
 # 把 SwiftPM 产物打成可安装的 MDQL.app（带快速查看扩展）。
-# 用法: ./build.sh [release|debug] [--arch arm64|x86_64]... [--universal]
+# 用法: ./build.sh [release|debug] [--arch arm64|x86_64]... [--universal] [--mas]
 #
 # 不指定架构就编本机的。发版要按架构各编一个：Intel 机器装不了只有 arm64 的包，
 # 而快速查看扩展没法像应用那样靠 Rosetta 兜底——扩展跟着宿主 Finder 的架构走。
 #   ./build.sh release --arch arm64
 #   ./build.sh release --arch x86_64
 # --universal 是 `--arch arm64 --arch x86_64` 的简写，两个架构打进一个包。
+#
+# --mas 打 App Store 版，和默认版差三处，都是沙箱逼的：
+#   1. 不带开链接的 XPC 服务——它靠「不在沙箱里」才能开链接，
+#      而上架要求包里每个可执行文件都沙箱化。代价是预览里的链接点不开。
+#   2. 宿主应用加沙箱，于是「扩展已启用」那行状态查不出来（«实测» 沙箱里
+#      pluginkit 问不到，让扩展写心跳也不行——快速查看扩展对 app group 容器
+#      只能读不能写），那一行干脆不显示，只留「打开系统设置」的入口。
+#   3. 图片只读被预览文档所在的目录。entitlement 仍是主目录只读（不给的话
+#      连同目录的图都读不到），但行为收窄到文档自己那一片，审核时说得清。
+#      默认版不收窄，图放在主目录哪儿都能显示。
 set -euo pipefail
 
 CONFIG=release
+MAS=0
 ARCHS=()
 while (( $# )); do
   case "$1" in
     release|debug) CONFIG="$1" ;;
     --arch) shift; [[ $# -gt 0 ]] || { echo "--arch 后面要跟架构名"; exit 2; }; ARCHS+=(--arch "$1") ;;
     --universal) ARCHS+=(--arch arm64 --arch x86_64) ;;
+    --mas) MAS=1 ;;
     *) echo "不认识的参数: $1"
        echo "用法: ./build.sh [release|debug] [--arch arm64|x86_64]... [--universal]"; exit 2 ;;
   esac
@@ -29,6 +41,7 @@ if [[ -z "$SIGNING_IDENTITY" && -f "$ROOT/.signing-identity" ]]; then
   SIGNING_IDENTITY="$(<"$ROOT/.signing-identity")"
 fi
 SIGNING_IDENTITY="${SIGNING_IDENTITY:--}"
+
 
 # CLT 缺组件；装了 Xcode 就优先用它的工具链
 if [[ -d /Applications/Xcode.app && -z "${DEVELOPER_DIR:-}" ]]; then
@@ -81,6 +94,7 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" \
 
 cp "$BIN/MDQL" "$APP/Contents/MacOS/MDQL"
 cp "$ROOT/Resources/Info.plist" "$APP/Contents/Info.plist"
+
 [[ -f "$ROOT/Resources/AppIcon.icns" ]] && cp "$ROOT/Resources/AppIcon.icns" "$APP/Contents/Resources/"
 
 # 界面文案。有哪些 .lproj，系统就认为支持哪些语言；都不匹配时退回
@@ -94,24 +108,45 @@ cp "$ROOT/QLExtension/Info.plist" "$EXT/Contents/Info.plist"
 
 # 开链接的 XPC 服务。扩展是强制沙箱的，在里面开不了外部链接；
 # 这个服务**不带 app-sandbox**，随扩展分发、由 launchd 按需拉起。
-cp "$BIN/MDQLOpener" "$OPENER/Contents/MacOS/MDQLOpener"
-cp "$ROOT/XPCService/Info.plist" "$OPENER/Contents/Info.plist"
+# 上架版不能带它（包里每个可执行文件都得沙箱化），链接因此点不开。
+if (( MAS )); then
+  rm -rf "$EXT/Contents/XPCServices"
+else
+  cp "$BIN/MDQLOpener" "$OPENER/Contents/MacOS/MDQLOpener"
+  cp "$ROOT/XPCService/Info.plist" "$OPENER/Contents/Info.plist"
+fi
 
 # 公式字体。Bundle.main 在扩展里就是 appex 自己，所以资源要放进扩展而不是宿主应用。
 python3 "$ROOT/Tools/prepare_swiftmath.py" --copy-resources \
   "$BIN/SwiftMath_SwiftMath.bundle" "$EXT/Contents/Resources/SwiftMath_SwiftMath.bundle"
 
+WORK="$(mktemp -d)"
+trap 'rm -rf "$WORK"' EXIT
+APP_ENTS=""
+if (( MAS )); then
+  # 上架版：宿主应用加沙箱，并让扩展把图片范围收窄到文档所在目录
+  APP_ENTS="$ROOT/Resources/MDQLApp.entitlements"
+  /usr/libexec/PlistBuddy -c "Add :MDQLScopeImagesToDocument bool true" \
+    "$EXT/Contents/Info.plist" >/dev/null
+fi
+
 # 从最里层往外签：外层的签名覆盖内层内容，反过来签外层会立刻失效。
 # 服务用空 entitlements——不带 app-sandbox 正是它能开链接的原因。
-codesign --force --sign "$SIGNING_IDENTITY" \
-  --entitlements "$ROOT/XPCService/MDQLOpener.entitlements" "$OPENER"
+if (( MAS == 0 )); then
+  codesign --force --sign "$SIGNING_IDENTITY" \
+    --entitlements "$ROOT/XPCService/MDQLOpener.entitlements" "$OPENER"
+fi
 codesign --force --sign "$SIGNING_IDENTITY" \
   --entitlements "$ROOT/QLExtension/MDQL.entitlements" "$EXT"
-codesign --force --sign "$SIGNING_IDENTITY" "$APP"
+if [[ -n "$APP_ENTS" ]]; then
+  codesign --force --sign "$SIGNING_IDENTITY" --entitlements "$APP_ENTS" "$APP"
+else
+  codesign --force --sign "$SIGNING_IDENTITY" "$APP"
+fi
 
 echo "✓ $APP"
-echo "  架构 $(lipo -archs "$EXT/Contents/MacOS/MDQLPreview")"
-echo "  开链接服务 $(du -h "$OPENER/Contents/MacOS/MDQLOpener" | cut -f1)"
+echo "  架构 $(lipo -archs "$EXT/Contents/MacOS/MDQLPreview")$( ((MAS)) && echo "  ·  App Store 版（无 XPC、宿主带沙箱）")"
+(( MAS )) || echo "  开链接服务 $(du -h "$OPENER/Contents/MacOS/MDQLOpener" | cut -f1)"
 echo "  扩展二进制 $(du -h "$EXT/Contents/MacOS/MDQLPreview" | cut -f1)，整个扩展 $(du -sh "$EXT" | cut -f1)，整包 $(du -sh "$APP" | cut -f1)"
 echo
 echo "  安装：把 MDQL.app 拖进 /Applications 后打开一次，系统才会注册扩展。"

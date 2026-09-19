@@ -1,9 +1,9 @@
 {
   "origin": "Lightlyn",
-  "commit": "976e301",
-  "synced": "2026-09-19T04:05:31Z",
+  "commit": "f92534d (工作区有未提交改动)",
+  "synced": "2026-09-19T08:45:50Z",
   "files": {
-    "Sources/MDQLPreview/Render/MarkdownRenderer.swift": { "from": "Sources/LightlynApp/Preview/Formats/Text/MarkdownRenderer.swift", "sha256": "947020a02cf8938cacc6c140f0bcc40ec5813286c3001f62227b7d4b0cc5763d" },
+    "Sources/MDQLPreview/Render/MarkdownRenderer.swift": { "from": "Sources/LightlynApp/Preview/Formats/Text/MarkdownRenderer.swift", "sha256": "781f59e83d79ffe475e647df5b7268ea18e628ae80da4ba2ed4f342fdb5f0611" },
     "Sources/MDQLPreview/Render/MarkdownMath.swift": { "from": "Sources/LightlynApp/Preview/Formats/Text/MarkdownMath.swift", "sha256": "53be2dc810eb5bbdb833389ea53d6586633fe8d0a2790b5e08c327eb7c41171e" },
     "Sources/MDQLPreview/Render/MarkdownHTML.swift": { "from": "Sources/LightlynApp/Preview/Formats/Text/MarkdownHTML.swift", "sha256": "88bbef2dd724177a1edf2568168ab8b93d34a09cb14483069c5cb4cb18f02701" },
     "Sources/MDQLPreview/Render/MarkdownFootnotes.swift": { "from": "Sources/LightlynApp/Preview/Formats/Text/MarkdownFootnotes.swift", "sha256": "b052d43e204e83dee040bfdbbf07b215bdbe32f6f0869b766c7fe96d10e10fee" },

@@ -77,12 +77,34 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
         let scoped = url.startAccessingSecurityScopedResource()
         defer { if scoped { url.stopAccessingSecurityScopedResource() } }
 
+        Self.gateImages(for: url)
+        defer { MarkdownRenderer.ImageLoader.permits = nil }
+
         guard let document = MarkdownRenderer.render(contentsOf: url) ?? Self.plainText(url) else {
             throw CocoaError(.fileReadCorruptFile)
         }
         scroll.setDocument(document)
         scroll.linkOpener = { [weak self] target in
             Self.open(target, through: self?.extensionContext)
+        }
+    }
+
+    /// 图片只读文档所在目录（含子目录）。
+    ///
+    /// 上架版打开它：entitlement 上虽然握着主目录只读，但行为收窄到「只读被预览
+    /// 文档自己那一片」——Markdown 的相对路径本来就是相对文档的，这是最小够用的范围，
+    /// 审核时也说得清。GitHub 版不打开，图放在哪都能显示。
+    static let scopeImagesToDocument =
+        Bundle.main.object(forInfoDictionaryKey: "MDQLScopeImagesToDocument") as? Bool ?? false
+
+    /// 这一篇允许读哪些图
+    private static func gateImages(for document: URL) {
+        guard scopeImagesToDocument else { MarkdownRenderer.ImageLoader.permits = nil; return }
+        let root = document.deletingLastPathComponent()
+            .resolvingSymlinksInPath().standardizedFileURL.path
+        MarkdownRenderer.ImageLoader.permits = { candidate in
+            let target = candidate.resolvingSymlinksInPath().standardizedFileURL.path
+            return target.hasPrefix(root.hasSuffix("/") ? root : root + "/")
         }
     }
 

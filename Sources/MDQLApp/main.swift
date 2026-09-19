@@ -47,6 +47,19 @@ enum ExtensionStatus {
 enum ExtensionProbe {
     static let identifier = "com.lightlyn.MDQL.QLExtension"
 
+    /// 自己在不在沙箱里。沙箱应用的 home 被重定向到容器。
+    static var sandboxed: Bool { NSHomeDirectory().contains("/Library/Containers/") }
+
+    /// 查不到就返回 nil —— 宁可不说，也不说错的。
+    ///
+    /// «实测» 沙箱里 `pluginkit` 问不到（同一份包、同一个位置，加上沙箱就误报
+    /// 「还没注册」）。让扩展往 app group 写心跳来替代也不行：快速查看扩展对
+    /// 共享容器**只能读不能写**，写测试直接「你没有权限保存到文件夹…」。
+    /// 沙箱之后没有第三条路，所以那一版（上架用）干脆不显示状态。
+    static func status() -> ExtensionStatus? {
+        sandboxed ? nil : run()
+    }
+
     /// 向 pluginkit 问一次。实测 10ms 以内，同步调就行。
     ///
     /// 匹配上的话输出一行，第一列是状态位（`-` 停用，`+` 显式启用，空格是默认）：
@@ -104,6 +117,7 @@ final class Delegate: NSObject, NSApplicationDelegate {
     private let detail = NSTextField(wrappingLabelWithString: "")
     private lazy var button = NSButton(title: T("open.settings"), target: self, action: #selector(openSettings))
 
+
     func applicationWillFinishLaunching(_ notification: Notification) {
         // 没有主菜单的话 ⌘W / ⌘Q / ⌘M 全是死的——这些快捷键是菜单项带来的，不是窗口自带的
         NSApp.mainMenu = makeMenu()
@@ -136,6 +150,8 @@ final class Delegate: NSObject, NSApplicationDelegate {
         button.bezelStyle = .rounded
         button.keyEquivalent = "\r"
 
+
+
         for view in [title, subtitle, hint, status, detail, button] { content.addArrangedSubview(view) }
         refresh()
 
@@ -167,14 +183,20 @@ final class Delegate: NSObject, NSApplicationDelegate {
 
     /// 检查过了才决定显不显示按钮——没问题的时候不该摆一个没用的入口
     private func refresh() {
-        let state = ExtensionProbe.run()
-        status.stringValue = state.summary
-        status.textColor = state.color
-        detail.stringValue = state.detail ?? ""
-        detail.isHidden = state.detail == nil
-        button.isHidden = state.ok
+        let state = ExtensionProbe.status()
+        status.isHidden = state == nil
+        detail.isHidden = state?.detail == nil
+        if let state {
+            status.stringValue = state.summary
+            status.textColor = state.color
+            detail.stringValue = state.detail ?? ""
+        }
+        // 查不出状态时按钮常驻：没法判断就别替用户判断，把入口留着
+        button.isHidden = state?.ok ?? false
+
         fitWindow()
     }
+
 
     @objc private func openSettings() {
         // Ventura 之后的扩展面板；打不开就退回系统设置本身，不留一个点了没反应的按钮。

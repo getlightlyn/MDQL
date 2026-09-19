@@ -20,8 +20,8 @@
 
 ## 安装
 
-1. 到 [Releases](https://github.com/getlightlyn/MDQL/releases) 下载对应芯片的包
-   （Apple 芯片选 `arm64`，Intel 选 `x86_64`；不确定就看苹果菜单 →「关于本机」），解压后拖进「应用程序」
+1. 到 [Releases](https://github.com/getlightlyn/MDQL/releases) 下载对应芯片的 `.dmg`
+   （Apple 芯片选 `arm64`，Intel 选 `x86_64`；不确定就看苹果菜单 →「关于本机」），打开后把 MDQL 拖进「应用程序」
 2. **打开一次**——系统要看到它启动过，才会把预览扩展注册进去
 3. 在访达里选中任意 `.md`，按空格
 

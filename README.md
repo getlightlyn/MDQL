@@ -20,8 +20,8 @@ Built on system APIs and TextKit, with as few outside dependencies as possible. 
 
 ## Install
 
-1. Grab the build for your chip from [Releases](https://github.com/getlightlyn/MDQL/releases)
-   (`arm64` for Apple silicon, `x86_64` for Intel — the Apple menu → “About This Mac” tells you which), unzip it and drop it in Applications
+1. Grab the `.dmg` for your chip from [Releases](https://github.com/getlightlyn/MDQL/releases)
+   (`arm64` for Apple silicon, `x86_64` for Intel — the Apple menu → “About This Mac” tells you which), open it and drag MDQL into Applications
 2. **Open it once** — macOS only registers the preview extension after it has seen the app launch
 3. Select any `.md` file in Finder and press Space
 
