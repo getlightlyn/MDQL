@@ -21,8 +21,8 @@ fi
 # 渲染器是从 Lightlyn 同步下来的副本，不该在这里被改过
 "$ROOT/Tools/check-render.sh"
 
-# 离线兜底：主项目解的是同一个版本的 SwiftMath，直接借它的仓库缓存。
-# 联网环境下不会走到这里，`swift build` 自己去 clone。
+# 离线兜底：旁边就有 Lightlyn 工作副本的话，借它已经解析好的 SwiftMath。
+# 独立 clone 里这个目录不存在，整段直接跳过，`swift build` 自己去 clone。
 if [[ ! -d "$ROOT/.build/checkouts/SwiftMath" && -d "$ROOT/../Lightlyn/.build/checkouts/SwiftMath" ]]; then
   echo "→ 借用主项目已解析的 SwiftMath"
   mkdir -p "$ROOT/.build"
@@ -31,10 +31,10 @@ if [[ ! -d "$ROOT/.build/checkouts/SwiftMath" && -d "$ROOT/../Lightlyn/.build/ch
   [[ -f "$ROOT/../Lightlyn/Package.resolved" ]] && cp "$ROOT/../Lightlyn/Package.resolved" "$ROOT/Package.resolved"
 fi
 
-# SwiftMath 的资源查找要指回 bundle 根；和主项目共用同一份补丁。
+# SwiftMath 的资源查找要指回 bundle 根，得先给它打个补丁。
 # 这一步要联网解析依赖；解不动但检出已经在的话就按离线走，不为一次 fetch 卡住构建。
 OFFLINE=()
-if ! python3 "$ROOT/../Lightlyn/Tools/prepare_swiftmath.py" \
+if ! python3 "$ROOT/Tools/prepare_swiftmath.py" \
        --package-path "$ROOT" --scratch-path "$ROOT/.build"; then
   [[ -d "$ROOT/.build/checkouts/SwiftMath" ]] || { echo "依赖解析失败，且本地没有 SwiftMath 检出"; exit 1; }
   echo "→ 联网解析失败，沿用已有检出（离线构建）"
@@ -69,7 +69,7 @@ cp "$BIN/MDQLOpener" "$OPENER/Contents/MacOS/MDQLOpener"
 cp "$ROOT/XPCService/Info.plist" "$OPENER/Contents/Info.plist"
 
 # 公式字体。Bundle.main 在扩展里就是 appex 自己，所以资源要放进扩展而不是宿主应用。
-python3 "$ROOT/../Lightlyn/Tools/prepare_swiftmath.py" --copy-resources \
+python3 "$ROOT/Tools/prepare_swiftmath.py" --copy-resources \
   "$BIN/SwiftMath_SwiftMath.bundle" "$EXT/Contents/Resources/SwiftMath_SwiftMath.bundle"
 
 # 从最里层往外签：外层的签名覆盖内层内容，反过来签外层会立刻失效。

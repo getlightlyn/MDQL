@@ -7,7 +7,7 @@ BIN="$ROOT/.build/release"
 [[ -d /Applications/Xcode.app && -z "${DEVELOPER_DIR:-}" ]] && export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
 
 rm -rf "$APP"; mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
-python3 "$ROOT/../Lightlyn/Tools/prepare_swiftmath.py" --copy-resources \
+python3 "$ROOT/Tools/prepare_swiftmath.py" --copy-resources \
   "$BIN/SwiftMath_SwiftMath.bundle" "$APP/Contents/Resources/SwiftMath_SwiftMath.bundle"
 python3 - "$ROOT/Resources/Info.plist" "$APP/Contents/Info.plist" <<'PY'
 import plistlib, sys

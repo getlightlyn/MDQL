@@ -3,9 +3,9 @@ import PackageDescription
 
 /// MDQL —— macOS 的 Markdown 快速查看扩展。
 ///
-/// 只有一个可执行 target：扩展本身。渲染器（`Sources/MDQLPreview/Render`）是**指向主项目
-/// 同一份源码的符号链接**，不是副本——两边同时改会立刻互相看见，不存在「哪边是新的」。
-/// 独立开源时把那个目录换成真文件或 submodule 即可，Package.swift 不用动。
+/// 渲染器（`Sources/MDQLPreview/Render`）是从 Lightlyn 同步下来的**只读副本**，
+/// 单向：上游改完跑 `Tools/sync-render.sh` 拿下来，`SOURCE.json` 记下每个文件的 sha256，
+/// `Tools/check-render.sh` 在每次构建前校验它没被就地改过。
 ///
 /// 全部编进同一个模块，所以共享的那几个文件不需要为了跨模块把类型变成 public。
 let package = Package(
