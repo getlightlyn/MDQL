@@ -20,8 +20,14 @@ parser.add_argument('--copy-resources', nargs=2, type=Path, metavar=('SOURCE', '
 args = parser.parse_args()
 if args.copy_resources:
     source, destination = args.copy_resources
+    # SwiftPM 单架构把 mathFonts.bundle 放在 bundle 根下；多架构（--arch a --arch b）
+    # 走的是 Xcode 那套，变成 Contents/Resources/。两种都认，否则 --universal 编不出来。
+    fonts = next((d for d in (source / 'mathFonts.bundle',
+                              source / 'Contents/Resources/mathFonts.bundle') if d.is_dir()), None)
+    if fonts is None:
+        raise SystemExit(f'Missing mathFonts.bundle under {source}')
     for name in ('latinmodern-math.otf', 'latinmodern-math.plist', 'GUST-FONT-LICENSE.txt'):
-        if not (source / 'mathFonts.bundle' / name).is_file():
+        if not (fonts / name).is_file():
             raise SystemExit(f'Missing math resource: {name}')
     def unused_fonts(directory, names):
         if Path(directory).name != 'mathFonts.bundle':

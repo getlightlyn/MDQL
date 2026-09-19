@@ -1,7 +1,7 @@
 {
   "origin": "Lightlyn",
-  "commit": "0bff162",
-  "synced": "2026-09-19T03:52:00Z",
+  "commit": "976e301",
+  "synced": "2026-09-19T04:05:31Z",
   "files": {
     "Sources/MDQLPreview/Render/MarkdownRenderer.swift": { "from": "Sources/LightlynApp/Preview/Formats/Text/MarkdownRenderer.swift", "sha256": "947020a02cf8938cacc6c140f0bcc40ec5813286c3001f62227b7d4b0cc5763d" },
     "Sources/MDQLPreview/Render/MarkdownMath.swift": { "from": "Sources/LightlynApp/Preview/Formats/Text/MarkdownMath.swift", "sha256": "53be2dc810eb5bbdb833389ea53d6586633fe8d0a2790b5e08c327eb7c41171e" },
@@ -9,6 +9,6 @@
     "Sources/MDQLPreview/Render/MarkdownFootnotes.swift": { "from": "Sources/LightlynApp/Preview/Formats/Text/MarkdownFootnotes.swift", "sha256": "b052d43e204e83dee040bfdbbf07b215bdbe32f6f0869b766c7fe96d10e10fee" },
     "Sources/MDQLPreview/Render/MarkdownEmoji.swift": { "from": "Sources/LightlynApp/Preview/Formats/Text/MarkdownEmoji.swift", "sha256": "027c6e04b70c8c2478bfe0cfb54ee1b1a544ad6dc82f5c536e4368efa33b9b12" },
     "Sources/MDQLPreview/Render/SyntaxHighlighter.swift": { "from": "Sources/LightlynApp/Preview/Formats/Text/SyntaxHighlighter.swift", "sha256": "634a0c922e5a49a660dccb7839f6425e0e731b0a85a243617f1bab215c23480d" },
-    "Tools/prepare_swiftmath.py": { "from": "Tools/prepare_swiftmath.py", "sha256": "287baa7ebc2d475ccd3e3c980d9bf440eb3e68d0e90fc9c8a27dd89e820e6c9b" }
+    "Tools/prepare_swiftmath.py": { "from": "Tools/prepare_swiftmath.py", "sha256": "a8bf2fee18f0c2fa0181e5c0c16c7f8a092bb04b66cd040aacb9d13d098ddf3a" }
   }
 }

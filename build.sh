@@ -1,9 +1,26 @@
 #!/bin/zsh
 # 把 SwiftPM 产物打成可安装的 MDQL.app（带快速查看扩展）。
-# 用法: ./build.sh [release|debug]
+# 用法: ./build.sh [release|debug] [--arch arm64|x86_64]... [--universal]
+#
+# 不指定架构就编本机的。发版要按架构各编一个：Intel 机器装不了只有 arm64 的包，
+# 而快速查看扩展没法像应用那样靠 Rosetta 兜底——扩展跟着宿主 Finder 的架构走。
+#   ./build.sh release --arch arm64
+#   ./build.sh release --arch x86_64
+# --universal 是 `--arch arm64 --arch x86_64` 的简写，两个架构打进一个包。
 set -euo pipefail
 
-CONFIG="${1:-release}"
+CONFIG=release
+ARCHS=()
+while (( $# )); do
+  case "$1" in
+    release|debug) CONFIG="$1" ;;
+    --arch) shift; [[ $# -gt 0 ]] || { echo "--arch 后面要跟架构名"; exit 2; }; ARCHS+=(--arch "$1") ;;
+    --universal) ARCHS+=(--arch arm64 --arch x86_64) ;;
+    *) echo "不认识的参数: $1"
+       echo "用法: ./build.sh [release|debug] [--arch arm64|x86_64]... [--universal]"; exit 2 ;;
+  esac
+  shift
+done
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 APP="$ROOT/dist/MDQL.app"
 EXT="$APP/Contents/PlugIns/MDQLPreview.appex"
@@ -41,10 +58,16 @@ if ! python3 "$ROOT/Tools/prepare_swiftmath.py" \
   OFFLINE=(--disable-automatic-resolution)
 fi
 
-echo "→ swift build -c $CONFIG"
-swift build --build-system native -c "$CONFIG" --package-path "$ROOT" "${OFFLINE[@]}"
+echo "→ swift build -c $CONFIG ${ARCHS[*]:-（本机架构）}"
+swift build --build-system native -c "$CONFIG" --package-path "$ROOT" "${OFFLINE[@]}" "${ARCHS[@]}"
 
-BIN="$ROOT/.build/$CONFIG"
+# 一个架构（不管是不是本机）走 SwiftPM 的常规目录；两个以上它会另起一个
+# Xcode 风格的目录，产物不在 .build/<配置> 下
+if (( ${#ARCHS[@]} > 2 )); then
+  BIN="$ROOT/.build/out/Products/$(echo "${CONFIG:0:1}" | tr '[:lower:]' '[:upper:]')${CONFIG:1}"
+else
+  BIN="$ROOT/.build/$CONFIG"
+fi
 [[ -x "$BIN/MDQL" ]] || { echo "宿主应用没编出来: $BIN/MDQL"; exit 1; }
 [[ -x "$BIN/MDQLPreview" ]] || { echo "扩展没编出来: $BIN/MDQLPreview"; exit 1; }
 [[ -x "$BIN/MDQLOpener" ]] || { echo "开链接服务没编出来: $BIN/MDQLOpener"; exit 1; }
@@ -81,6 +104,7 @@ codesign --force --sign "$SIGNING_IDENTITY" \
 codesign --force --sign "$SIGNING_IDENTITY" "$APP"
 
 echo "✓ $APP"
+echo "  架构 $(lipo -archs "$EXT/Contents/MacOS/MDQLPreview")"
 echo "  开链接服务 $(du -h "$OPENER/Contents/MacOS/MDQLOpener" | cut -f1)"
 echo "  扩展二进制 $(du -h "$EXT/Contents/MacOS/MDQLPreview" | cut -f1)，整个扩展 $(du -sh "$EXT" | cut -f1)，整包 $(du -sh "$APP" | cut -f1)"
 echo
