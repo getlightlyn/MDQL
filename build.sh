@@ -83,6 +83,12 @@ cp "$BIN/MDQL" "$APP/Contents/MacOS/MDQL"
 cp "$ROOT/Resources/Info.plist" "$APP/Contents/Info.plist"
 [[ -f "$ROOT/Resources/AppIcon.icns" ]] && cp "$ROOT/Resources/AppIcon.icns" "$APP/Contents/Resources/"
 
+# 界面文案。有哪些 .lproj，系统就认为支持哪些语言；都不匹配时退回
+# Info.plist 里 CFBundleDevelopmentRegion 指定的 en。
+for lproj in "$ROOT/Resources"/*.lproj; do
+  [[ -d "$lproj" ]] && cp -R "$lproj" "$APP/Contents/Resources/"
+done
+
 cp "$BIN/MDQLPreview" "$EXT/Contents/MacOS/MDQLPreview"
 cp "$ROOT/QLExtension/Info.plist" "$EXT/Contents/Info.plist"
 

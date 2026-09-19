@@ -1,0 +1,27 @@
+/* Window subtitle, %@ is the version number */
+"subtitle" = "Markdown 快速查看扩展 · %@";
+
+/* Main hint under the title */
+"hint" = "在访达里选中 .md 文件按空格即可预览。\n如果没有生效，到「系统设置 → 通用 → 登录项与扩展 → 快速查看」里查看有无同类扩展，确保只勾选 MDQL。";
+
+"open.settings" = "打开系统设置";
+
+/* Status line */
+"status.enabled" = "✓ 扩展已启用";
+"status.unregistered" = "⚠︎ 系统还没注册这个扩展";
+"status.disabled" = "⚠︎ 扩展被停用了";
+"status.othercopy" = "⚠︎ 系统用的是另一份 MDQL";
+
+/* What to do about it */
+"detail.unregistered" = "把 MDQL.app 拖进「应用程序」，再打开一次。";
+"detail.disabled" = "到「快速查看」里重新勾上 MDQL。";
+/* %@ is a filesystem path */
+"detail.othercopy" = "注册的是 %@，删掉多余的拷贝只留一份。";
+
+/* Menu bar */
+"menu.about" = "关于 MDQL";
+"menu.hide" = "隐藏 MDQL";
+"menu.quit" = "退出 MDQL";
+"menu.window" = "窗口";
+"menu.close" = "关闭";
+"menu.minimize" = "最小化";

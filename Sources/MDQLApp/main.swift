@@ -1,5 +1,12 @@
 import AppKit
 
+/// 界面文案按系统语言取。`Resources/<语言>.lproj/Localizable.strings` 里各一份，
+/// 系统语言不在里面就退回 en（`CFBundleDevelopmentRegion`）。
+func T(_ key: String, _ arguments: CVarArg...) -> String {
+    let format = NSLocalizedString(key, comment: "")
+    return arguments.isEmpty ? format : String(format: format, arguments: arguments)
+}
+
 /// 扩展在系统里的状态。
 ///
 /// 问的是 `pluginkit`，不是我们自己的记录——用户在系统设置里勾掉的那一下只有它知道。
@@ -17,10 +24,10 @@ enum ExtensionStatus {
 
     var summary: String {
         switch self {
-        case .enabled:      return "✓ 扩展已启用"
-        case .unregistered: return "⚠︎ 系统还没注册这个扩展"
-        case .disabled:     return "⚠︎ 扩展被停用了"
-        case .otherCopy:    return "⚠︎ 系统用的是另一份 MDQL"
+        case .enabled:      return T("status.enabled")
+        case .unregistered: return T("status.unregistered")
+        case .disabled:     return T("status.disabled")
+        case .otherCopy:    return T("status.othercopy")
         }
     }
 
@@ -28,9 +35,9 @@ enum ExtensionStatus {
     var detail: String? {
         switch self {
         case .enabled:      return nil
-        case .unregistered: return "把 MDQL.app 拖进「应用程序」，再打开一次。"
-        case .disabled:     return "到「快速查看」里重新勾上 MDQL。"
-        case .otherCopy(let path): return "注册的是 \(path)，删掉多余的拷贝只留一份。"
+        case .unregistered: return T("detail.unregistered")
+        case .disabled:     return T("detail.disabled")
+        case .otherCopy(let path): return T("detail.othercopy", path)
         }
     }
 
@@ -95,7 +102,7 @@ final class Delegate: NSObject, NSApplicationDelegate {
     private var window: NSWindow!
     private let status = NSTextField(labelWithString: "")
     private let detail = NSTextField(wrappingLabelWithString: "")
-    private lazy var button = NSButton(title: "打开系统设置", target: self, action: #selector(openSettings))
+    private lazy var button = NSButton(title: T("open.settings"), target: self, action: #selector(openSettings))
 
     func applicationWillFinishLaunching(_ notification: Notification) {
         // 没有主菜单的话 ⌘W / ⌘Q / ⌘M 全是死的——这些快捷键是菜单项带来的，不是窗口自带的
@@ -113,14 +120,10 @@ final class Delegate: NSObject, NSApplicationDelegate {
         title.font = .systemFont(ofSize: 28, weight: .semibold)
 
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0"
-        let subtitle = NSTextField(labelWithString: "Markdown 快速查看扩展 · \(version)")
+        let subtitle = NSTextField(labelWithString: T("subtitle", version))
         subtitle.textColor = .secondaryLabelColor
 
-        let hint = NSTextField(wrappingLabelWithString: """
-            在访达里选中 .md 文件按空格即可预览。
-            如果没有生效，到「系统设置 → 通用 → 登录项与扩展 → 快速查看」里\
-            查看有无同类扩展，确保只勾选 MDQL。
-            """)
+        let hint = NSTextField(wrappingLabelWithString: T("hint"))
         hint.alignment = .center
         hint.textColor = .secondaryLabelColor
         hint.preferredMaxLayoutWidth = 380
@@ -187,19 +190,19 @@ final class Delegate: NSObject, NSApplicationDelegate {
 
         let appItem = NSMenuItem()
         let appMenu = NSMenu(title: "MDQL")
-        appMenu.addItem(withTitle: "关于 MDQL",
+        appMenu.addItem(withTitle: T("menu.about"),
                         action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
         appMenu.addItem(.separator())
-        appMenu.addItem(withTitle: "隐藏 MDQL", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
+        appMenu.addItem(withTitle: T("menu.hide"), action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
         appMenu.addItem(.separator())
-        appMenu.addItem(withTitle: "退出 MDQL", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        appMenu.addItem(withTitle: T("menu.quit"), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         appItem.submenu = appMenu
         main.addItem(appItem)
 
         let windowItem = NSMenuItem()
-        let windowMenu = NSMenu(title: "窗口")
-        windowMenu.addItem(withTitle: "关闭", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
-        windowMenu.addItem(withTitle: "最小化",
+        let windowMenu = NSMenu(title: T("menu.window"))
+        windowMenu.addItem(withTitle: T("menu.close"), action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
+        windowMenu.addItem(withTitle: T("menu.minimize"),
                            action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")
         windowItem.submenu = windowMenu
         main.addItem(windowItem)

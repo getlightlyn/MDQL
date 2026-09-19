@@ -1,0 +1,27 @@
+/* Window subtitle, %@ is the version number */
+"subtitle" = "Markdown preview for Quick Look · %@";
+
+/* Main hint under the title */
+"hint" = "Select a .md file in Finder and press Space.\nIf nothing happens, open System Settings → General → Login Items & Extensions → Quick Look and make sure MDQL is the only Markdown preview checked.";
+
+"open.settings" = "Open System Settings";
+
+/* Status line */
+"status.enabled" = "✓ Extension is on";
+"status.unregistered" = "⚠︎ macOS hasn't registered the extension";
+"status.disabled" = "⚠︎ The extension is turned off";
+"status.othercopy" = "⚠︎ macOS is using a different copy of MDQL";
+
+/* What to do about it */
+"detail.unregistered" = "Move MDQL.app to Applications, then open it once.";
+"detail.disabled" = "Turn MDQL back on under Quick Look.";
+/* %@ is a filesystem path */
+"detail.othercopy" = "%@ is the one registered. Delete the spare copies and keep one.";
+
+/* Menu bar */
+"menu.about" = "About MDQL";
+"menu.hide" = "Hide MDQL";
+"menu.quit" = "Quit MDQL";
+"menu.window" = "Window";
+"menu.close" = "Close";
+"menu.minimize" = "Minimize";

@@ -4,61 +4,61 @@
 
 <h1 align="center">MDQL</h1>
 
-<p align="center">给你 mac 电脑上的 QuickLook 加上 Markdown 支持，按下空格，文档出现</p>
+<p align="center">Markdown in Quick Look. Select a file, press Space, read it.</p>
 
-<p align="center"><em>Markdown preview extension for macOS QuickLook</em></p>
+<p align="center"><b>English</b> · <a href="README.zh-CN.md">简体中文</a></p>
 
-## 特性
+## Features
 
-支持标题、列表、表格、代码高亮、公式、图片、原生 HTML、脚注、emoji，暂不支持远程图片与 mermaid
+Headings, lists, tables, syntax highlighting, math, images, inline HTML, footnotes and emoji. Remote images and mermaid aren't supported yet.
 
-使用系统 API 与 TextKit 作为基础，对外部依赖尽可能删减，这意味着：
+Built on system APIs and TextKit, with as few outside dependencies as possible. That buys you:
 
--   **快**：**99.97%** 的 Markdown 在 100ms 内渲染完成（M4 芯片，本机 83,284 份 Markdown 文件实测）
--   **小**：体积 **< 3 MB**，内存占用相比 HTML 方案低 **86%**
--   良好的深色模式适配
+-   **Fast**: **99.97%** of Markdown files render in under 100ms (measured on an M4 across 83,284 Markdown files found on one machine)
+-   **Small**: **< 3 MB** on disk, and **86%** less memory than an HTML-based previewer
+-   Dark mode that actually looks right
 
-## 安装
+## Install
 
-1. 到 [Releases](https://github.com/getlightlyn/MDQL/releases) 下载对应芯片的包
-   （Apple 芯片选 `arm64`，Intel 选 `x86_64`；不确定就看苹果菜单 →「关于本机」），解压后拖进「应用程序」
-2. **打开一次**——系统要看到它启动过，才会把预览扩展注册进去
-3. 在访达里选中任意 `.md`，按空格
+1. Grab the build for your chip from [Releases](https://github.com/getlightlyn/MDQL/releases)
+   (`arm64` for Apple silicon, `x86_64` for Intel — the Apple menu → “About This Mac” tells you which), unzip it and drop it in Applications
+2. **Open it once** — macOS only registers the preview extension after it has seen the app launch
+3. Select any `.md` file in Finder and press Space
 
-### 第一次打开会被拦住
+### macOS will block it the first time
 
-现在的版本还没做 Apple 公证，直接双击会提示"无法打开，因为无法验证开发者"。
-放行一次即可，之后就正常了：
+The app isn't notarized yet, so double-clicking gets you "cannot be opened because the developer cannot be verified". You only have to allow it once:
 
-1. 先双击一次 MDQL.app，让它被拦下来
-2. 打开「系统设置 → 隐私与安全性」，往下翻到"已阻止 MDQL"
-3. 点「仍要打开」
+1. Double-click MDQL.app and let it get blocked
+2. Open **System Settings → Privacy & Security**, scroll down to "MDQL was blocked"
+3. Click **Open Anyway**
 
-嫌麻烦的话，一条命令等效：
+Same thing from the command line:
 
 ```sh
 xattr -d com.apple.quarantine /Applications/MDQL.app
 ```
 
-### 预览没有变化？
+### Nothing changed in Quick Look?
 
-`.md` 可能被别的扩展占着。到「系统设置 → 通用 → 登录项与扩展 → 快速查看」里，把其它 Markdown 预览关掉、只留 MDQL。
+Another extension is probably claiming `.md` — macOS only ever picks one. Open **System Settings → General → Login Items & Extensions → Quick Look** and make sure MDQL is the only Markdown preview checked.
 
-确认是否注册成功：
+To confirm it registered:
 
 ```sh
 pluginkit -m -i com.lightlyn.MDQL.QLExtension
 ```
 
-## 自己编译
+## Build it yourself
 
 ```sh
-./build.sh release                    # 本机架构，产物在 dist/MDQL.app
-./build.sh release --arch x86_64      # 指定架构
-./build.sh release --universal        # 两个架构打进一个包
+./build.sh release                    # your own architecture, lands in dist/MDQL.app
+./build.sh release --arch x86_64      # a specific one
+./build.sh release --universal        # both in one bundle
 ```
 
-## 许可
+## License
 
-MIT，见 [LICENSE](LICENSE)。第三方素材与依赖见 [NOTICE](NOTICE)。
-有渲染相关的问题欢迎提交 issue；扩展本身、打包脚本、文档欢迎直接提 PR。
+MIT, see [LICENSE](LICENSE). Third-party assets and dependencies are listed in [NOTICE](NOTICE).
+
+Issues about rendering are welcome. Pull requests are welcome for the extension itself, the build scripts and the docs — the renderer under `Sources/MDQLPreview/Render/` is a read-only copy synced from upstream, so please open an issue for those instead.
