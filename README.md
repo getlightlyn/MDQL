@@ -6,8 +6,6 @@
 
 <p align="center">给你 mac 电脑上的 QuickLook 加上 Markdown 支持，按下空格，文档出现</p>
 
-<p align="center"><em>Markdown preview extension for macOS QuickLook</em></p>
-
 ## 特性
 
 支持标题、列表、表格、代码高亮、公式、图片、原生 HTML、脚注、emoji，暂不支持远程图片与 mermaid
