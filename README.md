@@ -14,27 +14,31 @@
 
 使用系统 API 与 TextKit 作为基础，对外部依赖尽可能删减，这意味着：
 
--   **快**：**99.97%** 的 Markdown 在 100ms 内渲染完成（基于本机 83,284 份 Markdown 文件实测）
+-   **快**：**99.97%** 的 Markdown 在 100ms 内渲染完成（M4 芯片，本机 83,284 份 Markdown 文件实测）
 -   **小**：体积 **< 3 MB**，内存占用相比 HTML 方案低 **86%**
 -   良好的深色模式适配
 
 ## 安装
 
-1. 下载 `MDQL.app`，拖进「应用程序」
+1. 到 [Releases](https://github.com/getlightlyn/MDQL/releases) 下载对应芯片的包
+   （Apple 芯片选 `arm64`，Intel 选 `x86_64`；不确定就看苹果菜单 →「关于本机」），解压后拖进「应用程序」
 2. **打开一次**——系统要看到它启动过，才会把预览扩展注册进去
 3. 在访达里选中任意 `.md`，按空格
 
 ### 第一次打开会被拦住
 
-现在的版本还没做 Apple 公证，直接双击会提示"无法打开，因为无法验证开发者"。绕过一次即可：
+现在的版本还没做 Apple 公证，直接双击会提示"无法打开，因为无法验证开发者"。
+放行一次即可，之后就正常了：
 
-**右键点 MDQL.app → 打开 → 再点「打开」。**
+1. 先双击一次 MDQL.app，让它被拦下来
+2. 打开「系统设置 → 隐私与安全性」，往下翻到"已阻止 MDQL"
+3. 点「仍要打开」
 
-用右键菜单里的「打开」，和双击走的是两条路——这条会给你一个"仍要打开"的按钮。
-只需要做一次，之后就正常了。
+嫌麻烦的话，一条命令等效：
 
-如果右键也没有「打开」选项，在「系统设置 → 隐私与安全性」往下翻，会看到
-"已阻止 MDQL"，点旁边的「仍要打开」。
+```sh
+xattr -d com.apple.quarantine /Applications/MDQL.app
+```
 
 ### 预览没有变化？
 
@@ -49,7 +53,9 @@ pluginkit -m -i com.lightlyn.MDQL.QLExtension
 ## 自己编译
 
 ```sh
-./build.sh release          # 产物在 dist/MDQL.app
+./build.sh release                    # 本机架构，产物在 dist/MDQL.app
+./build.sh release --arch x86_64      # 指定架构
+./build.sh release --universal        # 两个架构打进一个包
 ```
 
 ## 许可
